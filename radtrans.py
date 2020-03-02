@@ -7,15 +7,14 @@ import modelProblem
 import discretization
 import solver
 
-"""
-Main class of the project.
-Reads in parameter .ini file, specifies model, discretization method
-and solver parameters and discretizes and solves the radiative transfer
-problem for the given parameters. The numerical solution is then visualized.
-"""
-
 
 class RadiativeTransfer:
+    """
+    Main class of the project.
+    Reads in parameter .ini file, specifies model, discretization method
+    and solver parameters and discretizes and solves the radiative transfer
+    problem for the given parameters. The numerical solution is then visualized.
+    """
 
     def main(self, argv):
         # parse parameter file

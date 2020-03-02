@@ -5,13 +5,12 @@ import matplotlib.pyplot as plt
 import modelProblem
 import discretization
 
-"""
-For radiative transfer problems, it is beneficial
-to use the \Lambda iteration as a preconditioner
-"""
-
 
 class LambdaPreconditioner:
+    """
+    For radiative transfer problems, it is beneficial
+    to use the \Lambda iteration as a preconditioner
+    """
 
     def __init__(self, discretization):
         self.disc = discretization
@@ -20,15 +19,13 @@ class LambdaPreconditioner:
                 self.disc.lambda_prec, x))
 
 
-"""
-Class for the linear solvers.
-It can be specified as a direct or iterative GMRES solver.
-In case GMRES is selected, a preconditioner can be specified.
-Additionally, one can supply an initial guess.
-"""
-
-
 class Solver:
+    """
+    Class for the linear solvers.
+    It can be specified as a direct or iterative GMRES solver.
+    In case GMRES is selected, a preconditioner can be specified.
+    Additionally, one can supply an initial guess.
+    """
 
     def __init__(self, name, preconditioner):
         self.name = name

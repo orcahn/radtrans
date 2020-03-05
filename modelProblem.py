@@ -7,17 +7,26 @@ class ModelProblem1d:
     """
     Container for the parameters specifying a radiative transfer problem:
 
-    - in one spatial dimension
-    - for radation of a single frequency
-    - in a homogeneous medium of constant temperature
-    - with isotropic scattering
+        - in one spatial dimension
+        - for radation of a single frequency
+        - in a possibly inhomogeneous medium, made up of a single material of
+          constant temperature
+        - with isotropic scattering
 
     Attributes
     ----------
-    alb : float
-        Albedo of the medium.
     scat : string
         Type of scattering process assumed for the medium
+    absorption_coeff : Python function
+        The spatially varying absorption coefficient in a domain that is filled
+        with a single material of spatially varying density. This implies the
+        ratio between scattering coefficient and absorption coefficient is at a
+        fixed value xi throughout the domain.
+    xi : float
+        The ratio between scattering coefficient and absorption coefficient:
+        alpha_scat = xi * alpha_abs.
+    xip1 : float
+        The value of xi + 1.0, stored for conveniency.
     dom_len : float
         Length of the one-dimensional domain.
     inflow_bc : tuple of length 2
@@ -28,7 +37,7 @@ class ModelProblem1d:
         radiation and temperature of medium.
     """
 
-    def __init__(self, temperature, frequency, albedo, scattering,
+    def __init__(self, temperature, frequency, albedo, scattering, absorption,
                  domain_len, inflow_bc):
         """
         Parameters
@@ -43,6 +52,8 @@ class ModelProblem1d:
             scattering compared to absorption.
         scattering : string
             Type of scattering process assumed for the medium
+        absorption : Python function
+            Absorption coefficient assumed for the medium.
         domain_len : float
             Length of the one-dimensional domain. The domain itself is then
             defined as D = (0, dom_len).
@@ -59,13 +70,20 @@ class ModelProblem1d:
 
         self.s_eps = 1.0 / math.expm1(e_ratio)
 
-        assert 0.0 <= albedo and albedo <= 1.0, \
-            'Invalid albedo value. Must be in (0,1).'
+        assert 0.0 <= albedo and albedo < 1.0, \
+            'Invalid albedo value. Must be in [0,1).'
         self.alb = albedo
+        self.xi = 1.0 / (1.0 - albedo) - 1.0
+        self.xip1 = self.xi + 1.0
 
         assert scattering in ['none', 'isotropic'], \
             'Scattering process "' + scattering + '" not implemented.'
         self.scat = scattering
+
+        assert callable(absorption), \
+            'The absorption coefficient must be callable and take a value' + \
+            ' in the domain as argument.'
+        self.absorption_coeff = absorption
 
         assert domain_len > 0, 'Invalid domain length. Must be positive.'
         self.dom_len = domain_len
@@ -75,11 +93,11 @@ class ModelProblem1d:
             'For a 1d problem there must be exactly 2 conditions.'
         self.inflow_bc = inflow_bc
 
-        print('\nModel problem:\n' +
+        print('\n\nModel problem:\n' +
               '    - dimension: 1\n' +
               '    - domain: (0,' + str(domain_len) + ')\n' +
               '    - temperature: ' + str(temperature) + ' K\n' +
               '    - frequency: ' + str(frequency/1e12) + ' THz\n' +
               '    - s_eps: ' + str(self.s_eps) + '\n' +
               '    - albedo: ' + str(albedo) + '\n' +
-              '    - isotropic scattering\n\n')
+              '    - isotropic scattering\n\n\n')

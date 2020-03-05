@@ -15,6 +15,8 @@ class ModelProblem1d:
 
     Attributes
     ----------
+    alb : float	
+        Albedo of the medium.
     scat : string
         Type of scattering process assumed for the medium
     absorption_coeff : Python function

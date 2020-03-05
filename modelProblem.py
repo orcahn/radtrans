@@ -57,11 +57,7 @@ class ModelProblem1d:
         e_ratio = (natConstSI.h_pla * frequency) / \
                   (natConstSI.k_bol * temperature)
 
-        energy_threshold = 20
-
-        # leave emission at zero for high energy photons
-        if e_ratio < energy_threshold:
-            self.s_eps = 1.0 / math.expm1(e_ratio)
+        self.s_eps = 1.0 / math.expm1(e_ratio)
 
         assert 0.0 <= albedo and albedo <= 1.0, \
             'Invalid albedo value. Must be in (0,1).'

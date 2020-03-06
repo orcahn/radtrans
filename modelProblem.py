@@ -15,11 +15,11 @@ class ModelProblem1d:
 
     Attributes
     ----------
-    alb : float	
+    alb : float
         Albedo of the medium.
     scat : string
         Type of scattering process assumed for the medium
-    absorption_coeff : Python function
+    abs_fun : callable
         The spatially varying absorption coefficient in a domain that is filled
         with a single material of spatially varying density. This implies the
         ratio between scattering coefficient and absorption coefficient is at a
@@ -39,8 +39,8 @@ class ModelProblem1d:
         radiation and temperature of medium.
     """
 
-    def __init__(self, temperature, frequency, albedo, scattering, absorption,
-                 domain_len, inflow_bc):
+    def __init__(self, temperature, frequency, albedo, scattering,
+                 absorption_fun, domain_len, inflow_bc):
         """
         Parameters
         ----------
@@ -54,7 +54,7 @@ class ModelProblem1d:
             scattering compared to absorption.
         scattering : string
             Type of scattering process assumed for the medium
-        absorption : Python function
+        absorption_fun : callable
             Absorption coefficient assumed for the medium.
         domain_len : float
             Length of the one-dimensional domain. The domain itself is then
@@ -82,10 +82,10 @@ class ModelProblem1d:
             'Scattering process "' + scattering + '" not implemented.'
         self.scat = scattering
 
-        assert callable(absorption), \
+        assert callable(absorption_fun), \
             'The absorption coefficient must be callable and take a value' + \
             ' in the domain as argument.'
-        self.absorption_coeff = absorption
+        self.abs_fun = absorption_fun
 
         assert domain_len > 0, 'Invalid domain length. Must be positive.'
         self.dom_len = domain_len

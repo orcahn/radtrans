@@ -20,14 +20,14 @@ class FiniteVolume1d:
     mesh : one-dimensional np.ndarray
         Uniform mesh used for the FV discretization.
     alpha : one-dimensional np.ndarray
-        Array of the same shape as the mesh. The entries consist of the
-        L2 scalar product of the absorption coefficient with the basis
-        function corresponding to the cell in the mesh.
+        Array with same number of entries as there are cells. The entries
+        consist of the L2 scalar product of the absorption coefficient with
+        the basis function corresponding to the cell in the mesh.
     stiff_mat : scipy.sparse.csr.csr_matrix
         Sparse stiffness matrix of the system.
     lambda_prec : scipy.sparse.csr.csr_matrix
-        Explicit sparse representation of the linear preconditioner
-        used in the lambda iteration.
+        Explicit sparse representation of the linear preconditioner used in
+        the lambda iteration.
     load_vec : np.ndarray
         Dense load vector of the system.
     """
@@ -47,7 +47,7 @@ class FiniteVolume1d:
         self.n_ord = 2
         self.n_dof = self.n_ord * n_cells
         self.mesh, self.h = np.linspace(
-            0.0, mp.dom_len, num=n_cells, endpoint=True, retstep=True)
+            0.0, mp.dom_len, num=n_cells + 1, endpoint=True, retstep=True)
 
         self.stiff_mat = sps.csr_matrix((self.n_dof, self.n_dof))
 
@@ -75,13 +75,13 @@ class FiniteVolume1d:
         # basis functions corresponding to each cell. Order 4 gaussian
         # quadrature is used, which translates to 2 quadrature nodes per cell.
         self.alpha = np.array([fixed_quad(
-            mp.abs_fun, self.mesh[i], self.mesh[i+1], n=4)
+            mp.abs_fun, self.mesh[i], self.mesh[i+1], n=4)[0]
             for i in range(n_cells)])
 
         # diagonals of the transport and absorption part of the
         # complete FV stiffness matrix
-        ta_main = np.array([1.0 + mp.xip1 * self.alpha[j]
-                            for j in range(n_cells)])
+        ta_main = np.array([1.0 + mp.xip1 * self.alpha[k]
+                            for k in range(n_cells)])
 
         ta_off = np.full(n_cells - 1, -1.0)
 
@@ -113,8 +113,8 @@ class FiniteVolume1d:
                 for j in range(self.n_ord):
 
                     block_row_diag = np.array(
-                        [-sig[i, j] * mp.xi * self.alpha[j]
-                         for j in range(n_cells)])
+                        [-sig[i, j] * mp.xi * self.alpha[k]
+                         for k in range(n_cells)])
                     block_row += [sps.diags([block_row_diag],
                                             [0], format='csr')]
 

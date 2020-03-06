@@ -1,6 +1,8 @@
 import numpy as np
 import scipy.sparse as sps
 
+from scipy.integrate import fixed_quad
+
 
 class FiniteVolume1d:
     """
@@ -19,8 +21,8 @@ class FiniteVolume1d:
         Uniform mesh used for the FV discretization.
     alpha : one-dimensional np.ndarray
         Array of the same shape as the mesh. The entries consist of the
-        L2 scalar product of the spatially varying absorption coefficient
-        with the basis function corresponding to the entry.
+        L2 scalar product of the absorption coefficient with the basis
+        function corresponding to the cell in the mesh.
     stiff_mat : scipy.sparse.csr.csr_matrix
         Sparse stiffness matrix of the system.
     lambda_prec : scipy.sparse.csr.csr_matrix
@@ -28,11 +30,6 @@ class FiniteVolume1d:
         used in the lambda iteration.
     load_vec : np.ndarray
         Dense load vector of the system.
-
-    Methods
-    -------
-    __discretize_coefficient__(coeff):
-        ...
     """
 
     def __init__(self, mp, n_cells, do_weights=0):
@@ -74,12 +71,18 @@ class FiniteVolume1d:
                 for j in range(self.n_ord):
                     sig[i, j] = do_weights[i] * scat_prob
 
-        self.alpha = self.__discretize_coefficient__(mp.absorption_coeff)
+        # Compute the L2 scalar product of the absorption coefficient with the
+        # basis functions corresponding to each cell. Order 4 gaussian
+        # quadrature is used, which translates to 2 quadrature nodes per cell.
+        self.alpha = np.array([fixed_quad(
+            mp.abs_fun, self.mesh[i], self.mesh[i+1], n=4)
+            for i in range(n_cells)])
 
         # diagonals of the transport and absorption part of the
         # complete FV stiffness matrix
-        ta_main = np.array([1.0 + mp.xip1 * self.alpha[m]
-                            for m in range(n_cells)])
+        ta_main = np.array([1.0 + mp.xip1 * self.alpha[j]
+                            for j in range(n_cells)])
+
         ta_off = np.full(n_cells - 1, -1.0)
 
         ta_diag_blocks = []
@@ -110,8 +113,8 @@ class FiniteVolume1d:
                 for j in range(self.n_ord):
 
                     block_row_diag = np.array(
-                        [-sig[i, j] * mp.xi * self.alpha[m]
-                         for m in range(n_cells)])
+                        [-sig[i, j] * mp.xi * self.alpha[j]
+                         for j in range(n_cells)])
                     block_row += [sps.diags([block_row_diag],
                                             [0], format='csr')]
 
@@ -126,6 +129,3 @@ class FiniteVolume1d:
 
         self.load_vec[0] += mp.inflow_bc[0]
         self.load_vec[-1] += mp.inflow_bc[1]
-
-    def __discretize_coefficient__(self, coeff):
-        pass

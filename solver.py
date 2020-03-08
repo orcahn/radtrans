@@ -5,6 +5,12 @@ import matplotlib.pyplot as plt
 import modelProblem
 import discretization
 
+class solve_counter(object):
+    def __init__(self):
+        self.niter = 0
+    def __call__(self,rk=None):
+        self.niter += 1
+
 
 class LambdaPreconditioner:
     """
@@ -31,13 +37,25 @@ class Solver:
         self.name = name
         self.preconditioner = preconditioner
 
-    def solve(self, A, b, x_in=0):
+    def solve(self, A, b, x_in=None):
         if self.name == "SparseDirect":
             x = spsla.spsolve(A, b)
             return x
         elif self.name == "GMRES":
             if isinstance(self.preconditioner, LambdaPreconditioner):
                 M = self.preconditioner.M
-            x, exit_code = spsla.gmres(A=A, b=b, M=M, x0=x_in, tol=1e-8)
+            else:
+                M = None
+            counter = solve_counter()    
+            x, exit_code = spsla.gmres(A=A, b=b, M=M, x0=x_in, callback=counter, tol=1e-8)
             print("GMRES ended with exit code " + str(exit_code))
-            return x
+            return x,counter.niter
+        elif self.name == "BiCGSTAB":
+            if isinstance(self.preconditioner, LambdaPreconditioner):
+                M = self.preconditioner.M
+            else:
+                M = None
+            counter = solve_counter()    
+            x, exit_code = spsla.bicgstab(A=A, b=b, M=M, x0=x_in, callback=counter, tol=1e-8)
+            print("BiCGSTAB ended with exit code " + str(exit_code))
+            return x,counter.niter

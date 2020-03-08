@@ -36,41 +36,50 @@ class RadiativeTransfer:
                 e.strip()) for e in config.get(
                 'Model',
                 'QuadratureWeights').split(',')]
-        method = str(config['Discretization']['Name'])
-        n_cells = int(config['Discretization']['n_cells'])
+        self.method = str(config['Discretization']['Name'])
+        self.n_cells = int(config['Discretization']['n_cells'])
         solver_name = str(config['Solver']['Name'])
         preconditioner = str(config['Solver']['Preconditioner'])
-
+        initial_guess = str(config['Solver']['InitialGuess'])
         # define model problem and discretization
         domain = float(domain)  # 1d domain only has one length
         model_problem = modelProblem.ModelProblem1d(
             temperature, frequency, albedo, scattering, domain, boundary_values)
-        assert(method == "FiniteVolume")
+        assert(self.method == "FiniteVolume")
         if scattering == "isotropic":
-            disc = discretization.FiniteVolume1d(
-                model_problem, n_cells, quadrature_weights)
+            self.disc = discretization.FiniteVolume1d(
+                model_problem, self.n_cells, quadrature_weights)
         else:
-            disc = discretization.FiniteVolume1d(model_problem, n_cells)
+            self.disc = discretization.FiniteVolume1d(model_problem, self.n_cells)
 
         # define stiffness matrix, load vector, solver and preconditioner
         if preconditioner == "LambdaIteration":
-            preconditioner = solver.LambdaPreconditioner(disc)
-        A, b = disc.stiff_mat, disc.load_vec
+            preconditioner = solver.LambdaPreconditioner(self.disc)
+        A, b = self.disc.stiff_mat, self.disc.load_vec
 
-        # physical initial guess in case iterative solver is used
-        x_in = np.full(disc.n_dof, model_problem.s_eps)
-        linear_solver = solver.Solver(solver_name, preconditioner)
-        x = linear_solver.solve(A, b, x_in)
+        self.dom = np.arange(0.5 * self.disc.h, self.n_cells * self.disc.h, self.disc.h)
 
-        # output solution
-        dom = np.arange(0.5 * disc.h, n_cells * disc.h, disc.h)
-        if method == "FiniteVolume":
-            plt.step(dom, x[:n_cells])
+        if initial_guess == "Inflow":
+            x_in = np.full(self.disc.n_dof, model_problem.s_eps)
+        elif initial_guess == "Analytical":
+            sol = 0.5 * (model_problem.inflow_bc[0] * \
+                np.exp(-self.dom) + model_problem.s_eps * (1 - np.exp(-self.dom)) + model_problem.inflow_bc[1] * \
+                np.exp(-self.dom[::-1]) + model_problem.s_eps * (1 - np.exp(-self.dom[::-1]))) 
+            x_in = np.concatenate((sol,np.zeros(self.n_cells)),axis=0)
         else:
-            plt.plot(dom, x)
+            x_in = None
+        linear_solver = solver.Solver(solver_name, preconditioner)
+        self.x,self.iters = linear_solver.solve(A, b, x_in)
+
+    def output_results(self):
+        if self.method == "FiniteVolume":
+            plt.step(self.dom, self.x[:self.n_cells])
+        else:
+            plt.plot(self.dom, self.x)
         plt.show()
 
 
 if __name__ == "__main__":
     radtrans = RadiativeTransfer()
     radtrans.main(sys.argv)
+    radtrans.output_results()

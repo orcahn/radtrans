@@ -6,6 +6,11 @@ import modelProblem
 import discretization
 
 class solve_counter(object):
+    """
+    Simple class that counts the number of
+    iterations within a scipy iterative solver.
+    """
+
     def __init__(self):
         self.niter = 0
     def __call__(self,rk=None):
@@ -29,8 +34,8 @@ class Solver:
     """
     Class for the linear solvers.
     It can be specified as a direct or iterative GMRES solver.
-    In case GMRES is selected, a preconditioner can be specified.
-    Additionally, one can supply an initial guess.
+    In case GMRES or BiCGSTAB is selected, a preconditioner can 
+    be specified. Additionally, one can supply an initial guess.
     """
 
     def __init__(self, name, preconditioner):

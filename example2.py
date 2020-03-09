@@ -79,7 +79,7 @@ plt.legend()
 
 plt.subplot(2, 2, 4)
 plt.step(dom, x4[:N], label='FV_solution', where='mid')
-plt.step(dom, abs4)
+plt.step(dom, abs4, label='absorption coefficient')
 plt.legend()
 
 plt.show()

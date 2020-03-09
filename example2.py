@@ -34,8 +34,6 @@ def step_abs(x):
     return np.heaviside(x - L / 2.0, 1.0)
 
 
-print(step_abs(np.array([1, 2, 3, 4])))
-
 testModel1 = modelProblem.ModelProblem1d(
     300.0, 440e11, 0.2, 'isotropic', const_abs, L, [2.0, 1.0])
 testModel2 = modelProblem.ModelProblem1d(

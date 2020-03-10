@@ -7,8 +7,21 @@ class Absorption:
     spatially varying absorption coefficients
     """
 
-    def __init__(self, L):
+    def __init__(self, L, abs_type):
         self.L = L
+        self.abs_type = abs_type
+
+    def __call__(self, x):
+        if self.abs_type == 'Const':
+            return self.const_abs(x)
+        elif self.abs_type == 'PosGrad':
+            return self.pos_grad_abs(x)
+        elif self.abs_type == 'Gaussian':
+            return self.gaussian_abs(x)
+        elif self.abs_type == 'Step':
+            return self.step_abs(x)
+        else:
+            return self.no_abs(x)
 
     # test case: no absorption
     def no_abs(self, x):

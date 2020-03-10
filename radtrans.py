@@ -28,17 +28,7 @@ class RadiativeTransfer:
         scattering = str(config['Model']['Scattering'])
         domain = config['Model']['Domain']
         absorp = str(config['Model']['Absorption'])
-        absorption_coefficient = absorption.Absorption(float(domain))
-        if absorp == 'None':
-            absorption_coefficient = absorption_coefficient.no_abs
-        elif absorp == 'Const':
-            absorption_coefficient = absorption_coefficient.const_abs
-        elif absorp == 'PosGrad':
-            absorption_coefficient = absorption_coefficient.pos_grad_abs
-        elif absorp == 'Gaussian':
-            absorption_coefficient = absorption_coefficient.gaussian_abs
-        elif absorp == 'Step':
-            absorption_coefficient = absorption_coefficient.step_abs
+        absorption_coefficient = absorption.Absorption(float(domain), absorp)
         boundary_values = [
             float(
                 e.strip()) for e in config.get(

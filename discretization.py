@@ -125,7 +125,8 @@ class FiniteVolume1d:
             self.lambda_prec = lambda_prec
             self.stiff_mat = lambda_prec + s_mat
 
-        self.load_vec = np.full(self.n_dof, mp.s_eps * self.h)
+        self.load_vec = np.tile(np.array([mp.s_eps * self.alpha[m]
+                                          for m in range(n_cells)]), reps=2)
 
         self.load_vec[0] += mp.inflow_bc[0]
         self.load_vec[-1] += mp.inflow_bc[1]

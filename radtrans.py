@@ -29,7 +29,7 @@ class RadiativeTransfer:
         frequency = float(config['MODEL']['frequency'])
         albedo = float(config['MODEL']['albedo'])
         domain = float(config['MODEL']['domain'])
-        abs_type = str(config['MODEL']['absorption_type'])
+        abs_type = config['MODEL']['absorptionType']
 
         scattering = str(config['MODEL']['scattering'])
         assert scattering in ['none', 'isotropic'], \
@@ -49,11 +49,11 @@ class RadiativeTransfer:
                 'MODEL',
                 'quadratureWeights').split(',')]
 
-        self.method = str(config['DISCRETIZATION']['Name'])
+        self.method = str(config['DISCRETIZATION']['method'])
         self.n_cells = int(config['DISCRETIZATION']['n_cells'])
 
-        solver_name = str(config['SOLVER']['Name'])
-        initial_guess = str(config['SOLVER']['InitialGuess'])
+        solver_name = str(config['SOLVER']['solver'])
+        initial_guess = str(config['SOLVER']['initialGuess'])
 
         preconditioner = str(config['SOLVER']['Preconditioner'])
         assert preconditioner in ['none', 'LambdaIteration'], \
@@ -62,9 +62,9 @@ class RadiativeTransfer:
         # define model problem and discretization
         model_problem = modelProblem.ModelProblem1d(
             temperature, frequency, albedo, scattering,
-            absorption_coeff, domain, boundary_values)
+            absorption_coeff.abs_fun, domain, boundary_values)
 
-        assert(self.method == 'FiniteVolume')
+        assert(self.method == 'finiteVolume')
 
         if scattering == 'isotropic':
 
@@ -111,7 +111,7 @@ class RadiativeTransfer:
 
     def output_results(self):
 
-        if self.method == "FiniteVolume":
+        if self.method == "finiteVolume":
 
             plt.step(self.dom, self.x[:self.n_cells])
 

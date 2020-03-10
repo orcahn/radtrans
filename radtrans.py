@@ -69,7 +69,7 @@ class RadiativeTransfer:
         else:
             x_in = None
         linear_solver = solver.Solver(solver_name, preconditioner)
-        self.x,self.iters = linear_solver.solve(A, b, x_in)
+        self.x,self.iters,self.elapsed_time = linear_solver.solve(A, b, x_in)
 
     def output_results(self):
         if self.method == "FiniteVolume":

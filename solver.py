@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import scipy.sparse.linalg as spsla
 import matplotlib.pyplot as plt
@@ -51,16 +52,20 @@ class Solver:
                 M = self.preconditioner.M
             else:
                 M = None
-            counter = solve_counter()    
+            counter = solve_counter()
+            t = time.process_time()
             x, exit_code = spsla.gmres(A=A, b=b, M=M, x0=x_in, callback=counter, tol=1e-8)
-            print("GMRES ended with exit code " + str(exit_code))
-            return x,counter.niter
+            elapsed_time = time.process_time()-t
+            print("GMRES ended with exit code " + str(exit_code)+" after "+str(counter.niter)+" iterations in "+str(elapsed_time)+"s")
+            return x,counter.niter,elapsed_time
         elif self.name == "BiCGSTAB":
             if isinstance(self.preconditioner, LambdaPreconditioner):
                 M = self.preconditioner.M
             else:
                 M = None
-            counter = solve_counter()    
+            counter = solve_counter()   
+            t = time.process_time()
             x, exit_code = spsla.bicgstab(A=A, b=b, M=M, x0=x_in, callback=counter, tol=1e-8)
-            print("BiCGSTAB ended with exit code " + str(exit_code))
-            return x,counter.niter
+            elapsed_time = time.process_time()-t
+            print("BiCGSTAB ended with exit code " + str(exit_code)+" after "+str(counter.niter)+" iterations in "+str(elapsed_time)+"s")
+            return x,counter.niter,elapsed_time

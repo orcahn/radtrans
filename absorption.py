@@ -40,6 +40,10 @@ class Absorption:
 
     def __init__(self, abs_fun_type, domain_length):
 
+        assert abs_fun_type in ['none', 'const', 'posGrad', 'gaussian',
+                                'step'], 'Absorption type ' + abs_fun_type + \
+            ' currently not supported.'
+
         self.abs_fun = None
 
         if abs_fun_type == 'none':

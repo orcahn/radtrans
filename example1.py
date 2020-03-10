@@ -29,7 +29,10 @@ x2 = spsla.spsolve(testDisc2.stiff_mat, testDisc2.load_vec)
 x3 = spsla.spsolve(testDisc3.stiff_mat, testDisc3.load_vec)
 x4 = spsla.spsolve(testDisc4.stiff_mat, testDisc4.load_vec)
 
-sol = testModel1.inflow_bc[0] * \
+sol1 = testModel1.inflow_bc[0] * \
+    np.exp(-dom) + testModel1.s_eps * (1 - np.exp(-dom))
+
+sol2 = testModel1.inflow_bc[1] * \
     np.exp(-dom) + testModel1.s_eps * (1 - np.exp(-dom))
 
 # lambda iteration
@@ -48,7 +51,8 @@ x5, exitCode0 = spsla.gmres(A=testDisc4.stiff_mat, b=testDisc4.load_vec, M=M,
 
 # initial guess: analytic solution, i.e. no scattering
 x6, exitCode1 = spsla.gmres(A=testDisc3.stiff_mat, b=testDisc3.load_vec, M=M,
-                            x0=np.concatenate((sol, np.zeros((N,))), axis=0),
+                            x0=np.concatenate(
+                                sol1, np.flip(sol2, axis=0), axis=0),
                             tol=1e-8)
 
 print("gmres exit code: " + str(exitCode0))

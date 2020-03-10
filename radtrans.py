@@ -8,6 +8,7 @@ import discretization
 import solver
 import absorption
 
+
 class RadiativeTransfer:
     """
     Main class of the project.
@@ -37,7 +38,7 @@ class RadiativeTransfer:
         elif absorp == 'Gaussian':
             absorption_coefficient = absorption_coefficient.gaussian_abs
         elif absorp == 'Step':
-            absorption_coefficient = absorption_coefficient.step_abs           
+            absorption_coefficient = absorption_coefficient.step_abs
         boundary_values = [
             float(
                 e.strip()) for e in config.get(
@@ -63,27 +64,31 @@ class RadiativeTransfer:
             self.disc = discretization.FiniteVolume1d(
                 model_problem, self.n_cells, quadrature_weights)
         else:
-            self.disc = discretization.FiniteVolume1d(model_problem, self.n_cells)
+            self.disc = discretization.FiniteVolume1d(
+                model_problem, self.n_cells)
 
         # define stiffness matrix, load vector, solver and preconditioner
         if preconditioner == 'LambdaIteration':
             preconditioner = solver.LambdaPreconditioner(self.disc)
         A, b = self.disc.stiff_mat, self.disc.load_vec
 
-        self.dom = np.arange(0.5 * self.disc.h, self.n_cells * self.disc.h, self.disc.h)
+        self.dom = np.arange(
+            0.5 * self.disc.h, self.n_cells * self.disc.h, self.disc.h)
 
         if initial_guess == "Inflow":
             x_in = np.full(self.disc.n_dof, model_problem.s_eps)
         elif initial_guess == "Analytical":
             sol1 = model_problem.inflow_bc[0] * \
-                np.exp(-self.dom) + model_problem.s_eps * (1 - np.exp(-self.dom))
+                np.exp(-self.dom) + model_problem.s_eps * \
+                (1 - np.exp(-self.dom))
             sol2 = model_problem.inflow_bc[1] * \
-                np.exp(-self.dom[::-1]) + model_problem.s_eps * (1 - np.exp(-self.dom[::-1]))
+                np.exp(-self.dom[::-1]) + model_problem.s_eps * \
+                (1 - np.exp(-self.dom[::-1]))
             x_in = np.concatenate((sol1, sol2), axis=0)
         else:
             x_in = None
         linear_solver = solver.Solver(solver_name, preconditioner)
-        self.x,self.iters,self.elapsed_time = linear_solver.solve(A, b, x_in)
+        self.x, self.iters, self.elapsed_time = linear_solver.solve(A, b, x_in)
 
     def output_results(self):
         if self.method == "FiniteVolume":
@@ -91,6 +96,7 @@ class RadiativeTransfer:
         else:
             plt.plot(self.dom, self.x)
         plt.show()
+
 
 if __name__ == "__main__":
     radtrans = RadiativeTransfer()

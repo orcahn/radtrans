@@ -1,37 +1,63 @@
 import numpy as np
 
 
+# test case: no absorption
+def no_abs(x, L):
+
+    return np.zeros(x.shape)
+
+
+# constant absorption throughout the domain. Recovers the case of
+# homogeneous medium in the domain
+def const_abs(x, L):
+
+    return np.full(x.shape, 1.0)
+
+
+# positive gradient from 0.0 at 0 to 1.0 at L
+def pos_grad_abs(x, L):
+
+    return x / L
+
+
+# gaussian with stddev 1.0, centered at L/2
+def gaussian_abs(x, L):
+
+    return np.exp(-0.5 * (x - 0.5 * L) * (x - 0.5 * L)) / np.sqrt(2.0 * np.pi)
+
+
+# discontinuous absorption coefficient
+def step_abs(x, L):
+
+    return np.heaviside(x - L / 2.0, 1.0)
+
+
 class Absorption:
     """
     Class that represents some types of constant and
     spatially varying absorption coefficients
     """
 
-    def __init__(self, L):
-        self.L = L
+    def __init__(self, abs_fun_type, domain_length):
 
-    # test case: no absorption
-    def no_abs(self, x):
+        self.abs_fun = None
 
-        return np.zeros(x.shape)
+        if abs_fun_type == 'none':
 
-    # constant absorption throughout the domain. Recovers the case of
-    # homogeneous medium in the domain
-    def const_abs(self, x):
+            self.abs_fun = lambda x: no_abs(x, domain_length)
 
-        return np.full(x.shape, 1.0)
+        elif abs_fun_type == 'const':
 
-    # positive gradient from 0.0 at 0 to 1.0 at L
-    def pos_grad_abs(self, x):
+            self.abs_fun = lambda x: const_abs(x, domain_length)
 
-        return x / self.L
+        elif abs_fun_type == 'posGrad':
 
-    # gaussian with stddev 1.0, centered at L/2
-    def gaussian_abs(self, x):
+            self.abs_fun = lambda x: pos_grad_abs(x, domain_length)
 
-        return np.exp(-0.5 * (x - 0.5 * self.L) * (x - 0.5 * self.L)) / np.sqrt(2.0 * np.pi)
+        elif abs_fun_type == 'gaussian':
 
-    # discontinuous absorption coefficient
-    def step_abs(self, x):
+            self.abs_fun = lambda x: gaussian_abs(x, domain_length)
 
-        return np.heaviside(x - self.L / 2.0, 1.0)
+        elif abs_fun_type == 'step':
+
+            self.abs_fun = lambda x: step_abs(x, domain_length)

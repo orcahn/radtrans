@@ -46,10 +46,15 @@ class Solver:
     def solve(self, A, b, x_in=None):
 
         if self.name == "SparseDirect":
+            
+            t = time.process_time()
 
             x = spsla.spsolve(A, b)
+            elapsed_time = time.process_time()-t
 
-            return x
+            print("Sparse direct solver ended after "+str(elapsed_time)+"s")
+            
+            return x, None, elapsed_time
 
         elif self.name == "GMRES":
 

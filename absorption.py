@@ -31,12 +31,13 @@ def step_abs(x, L):
 
     return np.heaviside(x - L / 2.0, 1.0)
 
+
 def gaussian_random_piecewise(x, constants):
 
     bool_array1 = [x >= 0.5 * i for i in range(len(constants))]
     bool_array2 = [x < 0.5 * (i + 1) for i in range(len(constants))]
 
-    return np.piecewise(x, np.logical_and(bool_array1,bool_array2), constants)
+    return np.piecewise(x, np.logical_and(bool_array1, bool_array2), constants)
 
 
 class Absorption:
@@ -48,8 +49,9 @@ class Absorption:
     def __init__(self, abs_fun_type, domain_length):
 
         assert abs_fun_type in ['none', 'const', 'posGrad', 'gaussian',
-                                'step', 'gaussianRandomPiecewise'], 'Absorption type ' + abs_fun_type + \
-            ' currently not supported.'
+                                'step', 'gaussianRandomPiecewise'], \
+                                'Absorption type ' + abs_fun_type + \
+                                ' currently not supported.'
 
         self.abs_fun = None
 
@@ -74,9 +76,13 @@ class Absorption:
             self.abs_fun = lambda x: step_abs(x, domain_length)
 
         elif abs_fun_type == 'gaussianRandomPiecewise':
-            
+
             num_intervals = int(domain_length)*2
-            # Samples from a Gaussian distribution with mean 0.5 and standard deviation 0.15
-            constants = np.array([0.15 * np.random.randn() + 0.5 for i in range(num_intervals)]).clip(min=0,max=1)
+
+            # Samples from a Gaussian distribution with mean 0.5
+            # and standard deviation 0.15
+            constants = np.array(
+                [0.15 * np.random.randn() + 0.5
+                 for i in range(num_intervals)]).clip(min=0, max=1)
 
             self.abs_fun = lambda x: gaussian_random_piecewise(x, constants)

@@ -75,8 +75,8 @@ class Absorption:
 
         elif abs_fun_type == 'gaussianRandomPiecewise':
             
-            self.num_intervals = int(domain_length)*2
+            num_intervals = int(domain_length)*2
             # Samples from a Gaussian distribution with mean 0.5 and standard deviation 0.15
-            self.constants = np.array([0.15 * np.random.randn() + 0.5 for i in range(self.num_intervals)]).clip(min=0,max=1)
+            constants = np.array([0.15 * np.random.randn() + 0.5 for i in range(num_intervals)]).clip(min=0,max=1)
 
-            self.abs_fun = lambda x: gaussian_random_piecewise(x, self.constants)
+            self.abs_fun = lambda x: gaussian_random_piecewise(x, constants)

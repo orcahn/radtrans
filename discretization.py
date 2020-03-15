@@ -32,7 +32,7 @@ class FiniteVolume1d:
         Dense load vector of the system.
     """
 
-    def __init__(self, mp, n_cells, do_weights=0):
+    def __init__(self, mp, n_cells, do_weights=0, numericalFlux='upwind'):
         """
         Parameters
         ----------
@@ -43,6 +43,8 @@ class FiniteVolume1d:
         do_weights : tuple of length 2
             Weights for the quadrature of the discrete ordinates
         """
+
+        print(numericalFlux + ' numerical flux function used')
 
         self.n_ord = 2
         self.n_dof = self.n_ord * n_cells
@@ -80,16 +82,40 @@ class FiniteVolume1d:
 
         # diagonals of the transport and absorption part of the
         # complete FV stiffness matrix
-        ta_main = np.array([1.0 + mp.xip1 * self.alpha[k]
-                            for k in range(n_cells)])
-
-        ta_off = np.full(n_cells - 1, -1.0)
-
+        ta_main = None
+        ta_off1 = None
+        ta_off2 = None
         ta_diag_blocks = []
 
-        for m in range(self.n_ord):
-            ta_diag_blocks += [sps.diags([ta_main, ta_off],
-                                         [0, (-1)**(m+1)], format='csr')]
+        if numericalFlux == 'upwind':
+
+            ta_main = np.array([1.0 + mp.xip1 * self.alpha[k]
+                                for k in range(n_cells)])
+
+            ta_off = np.full(n_cells - 1, -1.0)
+
+            for m in range(self.n_ord):
+                ta_diag_blocks += [sps.diags([ta_main, ta_off],
+                                             [0, (-1)**(m+1)], format='csr')]
+
+        elif numericalFlux == 'centered':
+
+            ta_main = np.array([mp.xip1 * self.alpha[k]
+                                for k in range(n_cells)])
+
+            ta_main[0] += 0.5
+            ta_main[-1] += 0.5
+
+            ta_off1 = np.full(n_cells - 1, 0.5)
+            ta_off2 = -ta_off1
+
+            for m in range(self.n_ord):
+                ta_diag_blocks += [sps.diags([ta_main, ta_off1, ta_off2],
+                                             [0, (-1)**m, (-1)**(m+1)],
+                                             format='csr')]
+
+        else:
+            raise Exception('Unknown numerical flux function')
 
         # explicit representation of preconditioner used in the
         # lambda iteration

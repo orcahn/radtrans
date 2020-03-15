@@ -1,9 +1,9 @@
 import numpy as np
 import configparser
-import time
 
 from radtrans import RadiativeTransfer
 import matplotlib.pyplot as plt
+
 
 config = configparser.ConfigParser()
 radtrans = RadiativeTransfer()
@@ -39,7 +39,9 @@ for precond in ['none', 'LambdaIteration']:
             radtrans.main(['file: ', 'benchmarks.ini'])
             iters.append(radtrans.iters)
 
-        plt.title(r'1D, N=100, iso. scat., BVs: 1.0,0.0, abs.: step, precond.: '+precond)
+        plt.title(
+            r'1D, N=100, iso. scat., BVs: 1.0,0.0, abs.: step, precond.: ' +
+            precond)
         plt.plot(np.linspace(0, 1, 100), iters, label=solver)
         plt.xlabel(r'$\eta$')
         plt.ylabel('#iters')

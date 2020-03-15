@@ -114,9 +114,9 @@ class RadiativeTransfer:
     def output_results(self):
 
         if self.outputType == "firstOrdinate":
-            
+
             if self.method == "finiteVolume":
-            
+
                 plt.step(self.dom, self.x[:self.n_cells])
 
             else:
@@ -126,12 +126,14 @@ class RadiativeTransfer:
         elif self.outputType == "meanIntensity":
 
             if self.method == "finiteVolume":
-            
-                plt.step(self.dom, np.mean((self.x[self.n_cells:], self.x[:self.n_cells]), axis=0))
+
+                plt.step(self.dom, np.mean(
+                    (self.x[self.n_cells:], self.x[:self.n_cells]), axis=0))
 
             else:
 
-                plt.plot(self.dom, np.mean((self.x[self.n_cells:], self.x[:self.n_cells]), axis=0))
+                plt.plot(self.dom, np.mean(
+                    (self.x[self.n_cells:], self.x[:self.n_cells]), axis=0))
 
         plt.show()
 

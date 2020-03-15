@@ -52,7 +52,8 @@ class Solver:
             x = spsla.spsolve(A, b)
             elapsed_time = time.process_time() - t
 
-            print("Sparse direct solver ended after " + str(elapsed_time) + "s")
+            print("Sparse direct solver ended after " + str(elapsed_time) +
+                  "s")
 
             return x, None, elapsed_time
 

@@ -59,6 +59,8 @@ class RadiativeTransfer:
         assert preconditioner in ['none', 'LambdaIteration'], \
             'Preconditioner ' + preconditioner + ' currently not supported.'
 
+        self.outputType = str(config['OUTPUT']['type'])
+
         # define model problem and discretization
         model_problem = modelProblem.ModelProblem1d(
             temperature, frequency, albedo, scattering,
@@ -111,13 +113,25 @@ class RadiativeTransfer:
 
     def output_results(self):
 
-        if self.method == "finiteVolume":
+        if self.outputType == "firstOrdinate":
+            
+            if self.method == "finiteVolume":
+            
+                plt.step(self.dom, self.x[:self.n_cells])
 
-            plt.step(self.dom, self.x[:self.n_cells])
+            else:
 
-        else:
+                plt.plot(self.dom, self.x[:self.n_cells])
 
-            plt.plot(self.dom, self.x)
+        elif self.outputType == "meanIntensity":
+
+            if self.method == "finiteVolume":
+            
+                plt.step(self.dom, np.mean((self.x[self.n_cells:], self.x[:self.n_cells]), axis=0))
+
+            else:
+
+                plt.plot(self.dom, np.mean((self.x[self.n_cells:], self.x[:self.n_cells]), axis=0))
 
         plt.show()
 

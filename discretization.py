@@ -50,7 +50,7 @@ class FiniteVolume1d:
         do_weights : tuple of length 2
             Weights for the quadrature of the discrete ordinates
         """
-
+        
         print('Discretization:\n' +
               '    - number of cells: ' + str(n_cells) + '\n' +
               '    - number of discrete ordinates: ' + str(n_ordinates) +

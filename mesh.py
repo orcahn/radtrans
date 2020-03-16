@@ -11,30 +11,28 @@ class Mesh:
         self.length = length
         self.n_cells = n_cells
 
-        self.outer_normals = [1.0, -1.0]
+        # list of outer normal vectors
+        self.outer_normals = [np.array([1.0])]
 
         self.cell_boundaries, self.h = np.linspace(
             0.0, length, num=n_cells + 1, endpoint=True, retstep=True)
 
     def inflow_boundary_cells(self, ordIndex, n_dof):
 
-        ib_cells = []
+        cells = []
 
         if ordIndex == 0:
-            ib_cells += [0]
+
+            cells += [0]
+
         elif ordIndex == 1:
-            ib_cells += [n_dof - 1]
 
-        return ib_cells
+            cells += [n_dof - 1]
 
-    def outflow_boundary_cells(self, ordIndex, n_dof):
+        else:
+            raise Exception('Invalid ordinate index')
 
-        ob_cells = []
-
-        if ordIndex == 0:
-            ob_cells += [n_dof - 1]
-        elif ordIndex == 1:
-            ob_cells += [0]
+        return np.array([cells])
 
     # Compute the L2 scalar product of the absorption coefficient with the
     # basis functions corresponding to each cell. Order 4 gaussian

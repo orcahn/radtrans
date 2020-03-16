@@ -52,6 +52,7 @@ class RadiativeTransfer:
 
         self.method = str(config['DISCRETIZATION']['method'])
         self.n_cells = int(config['DISCRETIZATION']['n_cells'])
+        self.n_ordinates = int(config['DISCRETIZATION']['n_ordinates'])
 
         solver_name = str(config['SOLVER']['solver'])
         initial_guess = str(config['SOLVER']['initialGuess'])
@@ -63,8 +64,8 @@ class RadiativeTransfer:
         self.outputType = str(config['OUTPUT']['type'])
 
         # define model problem and discretization
-        model_problem = modelProblem.ModelProblem1d(
-            temperature, frequency, albedo, emissivity, scattering,
+        model_problem = modelProblem.ModelProblem(
+            dimension, temperature, frequency, albedo, emissivity, scattering,
             absorption_coeff.abs_fun, domain, boundary_values)
 
         assert(self.method == 'finiteVolume')
@@ -72,12 +73,13 @@ class RadiativeTransfer:
         if scattering == 'isotropic':
 
             self.disc = discretization.FiniteVolume1d(
-                model_problem, self.n_cells, quadrature_weights)
+                model_problem, self.n_cells, self.n_ordinates,
+                quadrature_weights)
 
         else:
 
             self.disc = discretization.FiniteVolume1d(
-                model_problem, self.n_cells)
+                model_problem, self.n_cells, self.n_ordinates)
 
         # define stiffness matrix, load vector, solver and preconditioner
         if preconditioner == 'LambdaIteration':

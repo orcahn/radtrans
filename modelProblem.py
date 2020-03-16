@@ -3,11 +3,11 @@ import math
 import natConstSI
 
 
-class ModelProblem1d:
+class ModelProblem:
     """
     Container for the parameters specifying a radiative transfer problem:
 
-        - in one spatial dimension
+        - in one or two spatial dimension
         - for radation of a single frequency
         - in a possibly inhomogeneous medium, made up of a single material of
           constant temperature
@@ -15,6 +15,8 @@ class ModelProblem1d:
 
     Attributes
     ----------
+    dim : integer
+        The dimension of the domain.
     alb : float
         Albedo of the medium.
     emiss : float
@@ -41,11 +43,13 @@ class ModelProblem1d:
         radiation and temperature of medium.
     """
 
-    def __init__(self, temperature, frequency, albedo, emissivity, scattering,
-                 absorption_fun, domain_len, inflow_bc):
+    def __init__(self, dimension, temperature, frequency, albedo, emissivity,
+                 scattering, absorption_fun, domain_len, inflow_bc):
         """
         Parameters
         ----------
+        dimension : integer
+            The dimension of the domain
         temperature : float
             Temperature of the medium, measured in Kelvin. It is assumed
             to be constant on the timescale of interest.
@@ -68,6 +72,11 @@ class ModelProblem1d:
             discrete ordinates. In one dimension there are exactly two
             ordinates.
         """
+
+        assert dimension in [1, 2], \
+            'Dimension ' + dimension + ' of the domain is not supported. ' + \
+            'Currently only 1 and 2 dimensions are supported.'
+        self.dim = dimension
 
         self.s_e = 0
 

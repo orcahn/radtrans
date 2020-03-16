@@ -32,7 +32,8 @@ class FiniteVolume1d:
         Dense load vector of the system.
     """
 
-    def __init__(self, mp, n_cells, do_weights=0, numericalFlux='upwind'):
+    def __init__(self, mp, n_cells, n_ordinates, do_weights=0,
+                 numericalFlux='upwind'):
         """
         Parameters
         ----------
@@ -44,10 +45,24 @@ class FiniteVolume1d:
             Weights for the quadrature of the discrete ordinates
         """
 
-        print(numericalFlux + ' numerical flux function used')
+        print('Discretization:\n' +
+              '    - number of cells: ' + str(n_cells) + '\n' +
+              '    - number of discrete ordinates: ' + str(n_ordinates) +
+              '\n    - numerical flux function used: ' +
+              numericalFlux + '\n\n\n')
 
-        self.n_ord = 2
+        # in one dimension there are only two possible discrete ordinates
+        self.n_ord = n_ordinates if mp.dim == 2 else 2
+
+        if mp.dim == 1 and n_ordinates != 2:
+            print('Warning: In one dimension two discrete ordinates' +
+                  '(+1.0, -1.0) will be used!')
+
+        # ordinate directions
+        ord_dir = [1.0, -1.0]
+
         self.n_dof = self.n_ord * n_cells
+
         self.mesh, self.h = np.linspace(
             0.0, mp.dom_len, num=n_cells + 1, endpoint=True, retstep=True)
 
@@ -62,12 +77,12 @@ class FiniteVolume1d:
                 'For isotropic scattering, quadrature weights for the ' + \
                 'discrete ordinates must be provided.'
 
-            assert len(do_weights) == 2, \
+            assert len(do_weights) == n_ordinates, \
                 'Number of quadrature weights provided and number of ' + \
                 'discrete ordinates do not match.'
 
             # scattering probability for all discrete ordinates
-            scat_prob = 1.0 / float(self.n_ord)
+            scat_prob = 1.0 / ((2.0 * np.pi)**(mp.dim - 1) * 2.0)
 
             for i in range(self.n_ord):
                 for j in range(self.n_ord):

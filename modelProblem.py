@@ -17,6 +17,8 @@ class ModelProblem1d:
     ----------
     alb : float
         Albedo of the medium.
+    emiss : float
+        Emissivity of the medium
     scat : string
         Type of scattering process assumed for the medium
     abs_fun : callable
@@ -34,12 +36,12 @@ class ModelProblem1d:
     inflow_bc : tuple of length 2
         Boundary conditions for the inflow boundaries of the corresponding
         discrete ordinates.
-    s_eps : float
+    s_e : float
         Value of the dimensionless planck function for given frequency of
         radiation and temperature of medium.
     """
 
-    def __init__(self, temperature, frequency, albedo, scattering,
+    def __init__(self, temperature, frequency, albedo, emissivity, scattering,
                  absorption_fun, domain_len, inflow_bc):
         """
         Parameters
@@ -52,6 +54,8 @@ class ModelProblem1d:
         albedo : float, 0 <= alb <= 1
             Albedo of the medium, i.e. a measure of the relative strength of
             scattering compared to absorption.
+        emissivity : float, 0 <= emiss <= 1
+            Emissivity of the medium.
         scattering : string
             Type of scattering process assumed for the medium
         absorption_fun : callable
@@ -65,16 +69,21 @@ class ModelProblem1d:
             ordinates.
         """
 
-        self.s_eps = 0
+        self.s_e = 0
 
         e_ratio = (natConstSI.h_pla * frequency) / \
                   (natConstSI.k_bol * temperature)
 
-        self.s_eps = 1.0 / math.expm1(e_ratio)
+        self.s_e = 1.0 / math.expm1(e_ratio)
 
         assert 0.0 <= albedo and albedo < 1.0, \
             'Invalid albedo value. Must be in [0,1).'
         self.alb = albedo
+
+        assert 0.0 <= emissivity and emissivity <= 1.0, \
+            'Invalid emissivity value. Must be in [0,1].'
+        self.emiss = emissivity
+
         self.xi = 1.0 / (1.0 - albedo) - 1.0
         self.xip1 = self.xi + 1.0
 
@@ -100,6 +109,6 @@ class ModelProblem1d:
               '    - domain: (0,' + str(domain_len) + ')\n' +
               '    - temperature: ' + str(temperature) + ' K\n' +
               '    - frequency: ' + str(frequency/1e12) + ' THz\n' +
-              '    - s_eps: ' + str(self.s_eps) + '\n' +
+              '    - s_e: ' + str(self.s_e) + '\n' +
               '    - albedo: ' + str(albedo) + '\n' +
               '    - isotropic scattering\n\n\n')

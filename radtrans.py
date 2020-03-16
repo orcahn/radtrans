@@ -28,6 +28,7 @@ class RadiativeTransfer:
         temperature = float(config['MODEL']['temperature'])
         frequency = float(config['MODEL']['frequency'])
         albedo = float(config['MODEL']['albedo'])
+        emissivity = float(config['MODEL']['emissivity'])
         domain = float(config['MODEL']['domain'])
         abs_type = config['MODEL']['absorptionType']
 
@@ -63,7 +64,7 @@ class RadiativeTransfer:
 
         # define model problem and discretization
         model_problem = modelProblem.ModelProblem1d(
-            temperature, frequency, albedo, scattering,
+            temperature, frequency, albedo, emissivity, scattering,
             absorption_coeff.abs_fun, domain, boundary_values)
 
         assert(self.method == 'finiteVolume')
@@ -89,16 +90,16 @@ class RadiativeTransfer:
 
         if initial_guess == "thermalEmission":
 
-            x_in = np.full(self.disc.n_dof, model_problem.s_eps)
+            x_in = np.full(self.disc.n_dof, model_problem.s_e)
 
         elif initial_guess == "noScattering":
 
             sol1 = model_problem.inflow_bc[0] * \
-                np.exp(-self.dom) + model_problem.s_eps * \
+                np.exp(-self.dom) + model_problem.s_e * \
                 (1 - np.exp(-self.dom))
 
             sol2 = model_problem.inflow_bc[1] * \
-                np.exp(-self.dom[::-1]) + model_problem.s_eps * \
+                np.exp(-self.dom[::-1]) + model_problem.s_e * \
                 (1 - np.exp(-self.dom[::-1]))
 
             x_in = np.concatenate((sol1, sol2), axis=0)

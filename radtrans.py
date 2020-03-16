@@ -88,7 +88,8 @@ class RadiativeTransfer:
         A, b = self.disc.stiff_mat, self.disc.load_vec
 
         self.dom = np.arange(
-            0.5 * self.disc.h, self.n_cells * self.disc.h, self.disc.h)
+            0.5 * self.disc.mesh.h, self.n_cells * self.disc.mesh.h,
+            self.disc.mesh.h)
 
         if initial_guess == "thermalEmission":
 

@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.sparse as sps
 
-from scipy.integrate import fixed_quad
+import mesh
 
 
 class FiniteVolume1d:
@@ -30,10 +30,16 @@ class FiniteVolume1d:
         the lambda iteration.
     load_vec : np.ndarray
         Dense load vector of the system.
+
+
+    Implementation Notes
+    --------------------
+    COO is a fast format for constructing sparse matrices. Once a matrix has
+    been constructed, it will be converted to CSR format for fast arithmetic
+    and matrix vector operations needed in the solvers.
     """
 
-    def __init__(self, mp, n_cells, n_ordinates, do_weights=0,
-                 numericalFlux='upwind'):
+    def __init__(self, mp, n_cells, n_ordinates, do_weights=0):
         """
         Parameters
         ----------
@@ -48,8 +54,11 @@ class FiniteVolume1d:
         print('Discretization:\n' +
               '    - number of cells: ' + str(n_cells) + '\n' +
               '    - number of discrete ordinates: ' + str(n_ordinates) +
-              '\n    - numerical flux function used: ' +
-              numericalFlux + '\n\n\n')
+              '\n\n\n')
+
+        # --------------------------------------------------------------------
+        #               DISCRETE ORDINATES AND SCATTERING
+        # --------------------------------------------------------------------
 
         # in one dimension there are only two possible discrete ordinates
         self.n_ord = n_ordinates if mp.dim == 2 else 2
@@ -57,13 +66,6 @@ class FiniteVolume1d:
         if mp.dim == 1 and n_ordinates != 2:
             print('Warning: In one dimension two discrete ordinates' +
                   '(+1.0, -1.0) will be used!')
-
-        self.n_dof = self.n_ord * n_cells
-
-        self.mesh, self.h = np.linspace(
-            0.0, mp.dom_len, num=n_cells + 1, endpoint=True, retstep=True)
-
-        self.stiff_mat = sps.csr_matrix((self.n_dof, self.n_dof))
 
         # scattering coefficients for the chosen process
         sig = np.zeros((self.n_ord, self.n_ord))
@@ -83,88 +85,113 @@ class FiniteVolume1d:
 
             for i in range(self.n_ord):
                 for j in range(self.n_ord):
-                    sig[i, j] = do_weights[i] * scat_prob
+                    sig[i, j] = mp.xi * do_weights[i] * scat_prob
 
-        # Compute the L2 scalar product of the absorption coefficient with the
-        # basis functions corresponding to each cell. Order 4 gaussian
-        # quadrature is used, which translates to 2 quadrature nodes per cell.
-        self.alpha = np.array([fixed_quad(
-            mp.abs_fun, self.mesh[i], self.mesh[i+1], n=4)[0]
-            for i in range(n_cells)])
+        # --------------------------------------------------------------------
+        #               MESH GENERATION AND MATRIX ASSEMBLY
+        # --------------------------------------------------------------------
 
-        # diagonals of the transport and absorption part of the
-        # complete FV stiffness matrix
-        ta_main = None
-        ta_off1 = None
-        ta_off2 = None
-        ta_diag_blocks = []
+        self.n_dof = self.n_ord * n_cells
 
-        if numericalFlux == 'upwind':
+        self.mesh = mesh.Mesh(mp.dom_len, n_cells)
 
-            ta_main = np.array([1.0 + mp.xip1 * self.alpha[k]
-                                for k in range(n_cells)])
+        self.alpha = mp.xip1 * self.mesh.integrate_cellwise(mp.abs_fun)
 
-            ta_off = np.full(n_cells - 1, -1.0)
-
-            for m in range(self.n_ord):
-                ta_diag_blocks += [sps.diags([ta_main, ta_off],
-                                             [0, (-1)**(m+1)], format='csr')]
-
-        elif numericalFlux == 'centered':
-
-            ta_main = np.array([mp.xip1 * self.alpha[k]
-                                for k in range(n_cells)])
-
-            ta_main[0] += 0.5
-            ta_main[-1] += 0.5
-
-            ta_off1 = np.full(n_cells - 1, 0.5)
-            ta_off2 = -ta_off1
-
-            for m in range(self.n_ord):
-                ta_diag_blocks += [sps.diags([ta_main, ta_off1, ta_off2],
-                                             [0, (-1)**m, (-1)**(m+1)],
-                                             format='csr')]
-
-        else:
-            raise Exception('Unknown numerical flux function')
-
-        # explicit representation of preconditioner used in the
-        # lambda iteration
-        lambda_prec = sps.block_diag(ta_diag_blocks, format='csr')
+        # coo-format matrices representing the contributions
+        # to the stiffness matrix
+        ta_data = self.__assemble_transport_absorption__(n_cells, n_ordinates)
+        s_data = self.__assemble_scattering__(sig, n_cells, n_ordinates)
 
         if mp.scat == 'none':
 
+            self.stiff_mat = sps.coo_matrix((
+                ta_data[0], (ta_data[1], ta_data[2])),
+                shape=(n_cells, n_cells))
+
             self.lambda_prec = sps.csr_matrix((self.n_dof, self.n_dof))
-            self.stiff_mat = lambda_prec
+            self.stiff_mat = self.stiff_mat.tocsr()
 
         else:
 
-            # block diagonals occuring in the scattering part s_mat of the
-            # complete FV stiffness matrix
-            s_diags = []
+            # concatenate indices and data of transport and scattering part
+            data = [np.concatenate((ta_data[r], s_data[r]), axis=0)
+                    for r in range(3)]
 
-            for i in range(self.n_ord):
+            self.lambda_prec = sps.coo_matrix((
+                ta_data[0], (ta_data[1], ta_data[2])),
+                shape=(self.n_dof, self.n_dof))
 
-                block_row = []
+            self.stiff_mat = sps.coo_matrix((data[0], (data[1], data[2])),
+                                            shape=(self.n_dof, self.n_dof))
 
-                for j in range(self.n_ord):
+            # By default when converting to CSR or CSC format, duplicate (i,j)
+            # entries will be summed together
+            self.lambda_prec = self.lambda_prec.tocsr()
+            self.stiff_mat = self.stiff_mat.tocsr()
 
-                    block_row_diag = np.array(
-                        [-sig[i, j] * mp.xi * self.alpha[k]
-                         for k in range(n_cells)])
-                    block_row += [sps.diags([block_row_diag],
-                                            [0], format='csr')]
-
-                s_diags += [block_row]
-
-            s_mat = sps.bmat(s_diags, format='csr')
-
-            self.lambda_prec = lambda_prec
-            self.stiff_mat = lambda_prec + s_mat
+        # --------------------------------------------------------------------
+        #                       LOAD VECTOR ASSEMBLY
+        # --------------------------------------------------------------------
 
         self.load_vec = np.tile(np.array([mp.emiss * mp.s_e * self.alpha[m]
                                           for m in range(n_cells)]), reps=2)
 
-        self.load_vec[0] += mp.inflow_bc[0]
-        self.load_vec[-1] += mp.inflow_bc[1]
+        # add boundary conditions
+        for m in range(n_ordinates):
+            self.load_vec[self.mesh.inflow_boundary_cells(m, self.n_dof)] += \
+                mp.inflow_bc[m]
+
+    def __assemble_transport_absorption__(self, nc, no):
+
+        row = []
+        col = []
+        data = []
+
+        def upwind_indices(m, i):
+
+            # index of the diagonal entry in this row
+            de = m * nc + k
+
+            if m == 0:
+                if i == 0:
+                    return ((de), (de))
+                else:
+                    return ((de, de), (de - 1, de))
+            else:
+                if i == self.mesh.n_cells - 1:
+                    return ((de), (de))
+                else:
+                    return ((de, de), (de + 1, de))
+
+        for m in range(no):
+            for k in range(nc):
+
+                if (m == 0 and k == 0) or (m == 1 and k == nc - 1):
+
+                    data += [1.0, self.alpha[k]]
+                    row += [upwind_indices(m, k)[0], m * nc + k]
+                    col += [upwind_indices(m, k)[1], m * nc + k]
+
+                else:
+
+                    data += [-1.0, 1.0, self.alpha[k]]
+                    row += [*(upwind_indices(m, k)[0]), m * nc + k]
+                    col += [*(upwind_indices(m, k)[1]), m * nc + k]
+
+        return np.array(data), np.array(row), np.array(col)
+
+    def __assemble_scattering__(self, sig, nc, no):
+
+        row = []
+        col = []
+        data = []
+
+        for m in range(no):
+            for k in range(nc):
+
+                row += [m * nc + k, m * nc + k]
+                col += [k, k + nc]
+                data += [-sig[m, 0] * self.alpha[k], -
+                         sig[m, 1] * self.alpha[k]]
+
+        return np.array(data), np.array(row), np.array(col)

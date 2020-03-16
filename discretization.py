@@ -58,9 +58,6 @@ class FiniteVolume1d:
             print('Warning: In one dimension two discrete ordinates' +
                   '(+1.0, -1.0) will be used!')
 
-        # ordinate directions
-        ord_dir = [1.0, -1.0]
-
         self.n_dof = self.n_ord * n_cells
 
         self.mesh, self.h = np.linspace(

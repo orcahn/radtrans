@@ -50,7 +50,7 @@ class FiniteVolume1d:
         do_weights : tuple of length 2
             Weights for the quadrature of the discrete ordinates
         """
-        
+
         print('Discretization:\n' +
               '    - number of cells: ' + str(n_cells) + '\n' +
               '    - number of discrete ordinates: ' + str(n_ordinates) +
@@ -144,8 +144,7 @@ class FiniteVolume1d:
         #                       LOAD VECTOR ASSEMBLY
         # --------------------------------------------------------------------
 
-        self.load_vec = np.tile(np.array([mp.emiss * mp.s_e * self.alpha[m]
-                                          for m in range(n_cells)]), reps=2)
+        self.load_vec = np.tile(mp.emiss * mp.s_e * self.alpha, reps=2)
 
         # add boundary conditions
         for m in range(n_ordinates):

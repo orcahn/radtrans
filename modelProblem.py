@@ -120,4 +120,5 @@ class ModelProblem:
               '    - frequency: ' + str(frequency/1e12) + ' THz\n' +
               '    - s_e: ' + str(self.s_e) + '\n' +
               '    - albedo: ' + str(albedo) + '\n' +
+              '    - emissivity: ' + str(emissivity) + '\n' +
               '    - isotropic scattering\n\n\n')

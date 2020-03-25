@@ -157,3 +157,81 @@ class FiniteVolume1d:
 
         self.load_vec[0] += mp.inflow_bc[0]
         self.load_vec[-1] += mp.inflow_bc[1]
+
+class FiniteVolumeDiffusion1d:
+    """
+    This class represents a one-dimensional finite-volume discretization of
+    the diffusion limit equation
+
+    Attributes
+    ------
+    n_dof : integer
+        Total number of degrees of freedom in the complete system.
+    n_ord : integer
+        Total number of discrete ordinates.
+    h : float
+        Length of a single cell.
+    mesh : one-dimensional np.ndarray
+        Uniform mesh used for the FV discretization.
+    alpha : one-dimensional np.ndarray
+        Array with same number of entries as there are cells. The entries
+        consist of the L2 scalar product of the absorption coefficient with
+        the basis function corresponding to the cell in the mesh.
+    stiff_mat : scipy.sparse.csr.csr_matrix
+        Sparse stiffness matrix of the system.
+    lambda_prec : scipy.sparse.csr.csr_matrix
+        Explicit sparse representation of the linear preconditioner used in
+        the lambda iteration.
+    load_vec : np.ndarray
+        Dense load vector of the system.
+    """
+
+    def __init__(self, mp, n_cells):
+        """
+        Parameters
+        ----------
+        mp : modelProblem.ModelProblem1d
+            Radiative Transfer problem to be discretized
+        n_cells : integer
+            Total number of cells used to subdivide the domain
+        do_weights : tuple of length 2
+            Weights for the quadrature of the discrete ordinates
+        """
+        print('Discretization:\n' +
+              '    - number of cells: ' + str(n_cells) + '\n\n\n')
+
+        self.n_dof = n_cells
+        self.mesh, self.h = np.linspace(
+            0.0, mp.dom_len, num=n_cells + 1, endpoint=True, retstep=True)
+
+        self.stiff_mat = sps.csr_matrix((self.n_dof, self.n_dof))
+
+        # Compute the L2 scalar product of the absorption coefficient with the
+        # basis functions corresponding to each cell. Order 4 gaussian
+        # quadrature is used, which translates to 2 quadrature nodes per cell.
+        self.alpha = np.array([fixed_quad(
+            mp.abs_fun, self.mesh[i], self.mesh[i+1], n=4)[0]
+            for i in range(n_cells)])
+
+        # diagonals of the transport and absorption part of the
+        # complete FV stiffness matrix
+        ta_main = None
+        ta_off = None
+        ta_diag_blocks = []
+
+        ta_main = np.array([ - (1 / (mp.xip1 * mp.abs_fun(k*self.h)) + 1 / (mp.xip1 * mp.abs_fun((k+1)*self.h))) - self.alpha[k]
+                                for k in range(n_cells)])
+
+        ta_off = np.array([1 / (mp.xip1 * mp.abs_fun(k*self.h)) for k in range(1,n_cells)])
+
+        ta_diag_blocks += [sps.diags([ta_main, ta_off, ta_off],
+                                                [0, 1, -1],
+                                                format='csr')]
+
+        # explicit representation of preconditioner used in the
+        # lambda iteration
+        self.lambda_prec = 1./(3. * self.h) * sps.block_diag(ta_diag_blocks, format='csr')
+        self.stiff_mat = self.lambda_prec
+
+        self.load_vec = -1. * np.array([mp.s_eps * self.alpha[m]
+                                          for m in range(n_cells)])

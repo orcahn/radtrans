@@ -28,7 +28,7 @@ class RadiativeTransfer:
         dimension = int(config['MODEL']['dimension'])
         temperature = float(config['MODEL']['temperature'])
         frequency = float(config['MODEL']['frequency'])
-        albedo = float(config['MODEL']['albedo'])
+        self.albedo = float(config['MODEL']['albedo'])
         domain = float(config['MODEL']['domain'])
         abs_type = config['MODEL']['absorptionType']
 
@@ -64,7 +64,7 @@ class RadiativeTransfer:
 
         # define model problem and discretization
         model_problem = modelProblem.ModelProblem1d(
-            temperature, frequency, albedo, scattering,
+            temperature, frequency, self.albedo, scattering,
             absorption_coeff.abs_fun, domain, boundary_values)
 
         assert(self.method == 'finiteVolume')
@@ -73,13 +73,25 @@ class RadiativeTransfer:
 
         if scattering == 'isotropic':
 
-            self.disc = discretization.FiniteVolume1d(
-                model_problem, self.n_cells, quadrature_weights)
+            if self.albedo <= 0.9:
+
+                self.disc = discretization.FiniteVolume1d(
+                    model_problem, self.n_cells, quadrature_weights)
+
+            else:
+
+                self.disc = discretization.FiniteVolumeDiffusion1d(model_problem, self.n_cells)
 
         else:
 
-            self.disc = discretization.FiniteVolume1d(
-                model_problem, self.n_cells)
+            if self.albedo <= 0.9:
+
+                self.disc = discretization.FiniteVolume1d(
+                    model_problem, self.n_cells)
+
+            else:
+
+                self.disc = discretization.FiniteVolumeDiffusion1d(model_problem, self.n_cells)
 
         elapsed_time = time.process_time() - t
         print("Matrix and vector assembly took " + str(elapsed_time) +
@@ -147,8 +159,14 @@ class RadiativeTransfer:
 
             if self.method == "finiteVolume":
 
-                plt.step(self.dom, np.mean(
-                    (self.x[self.n_cells:], self.x[:self.n_cells]), axis=0))
+                if self.albedo <= 0.9:
+                
+                    plt.step(self.dom, np.mean(
+                        (self.x[self.n_cells:], self.x[:self.n_cells]), axis=0))
+
+                else:
+
+                    plt.step(self.dom, self.x)
 
             else:
 

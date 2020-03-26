@@ -1,7 +1,13 @@
 import numpy as np
 
-
 from scipy.integrate import fixed_quad
+from enum import IntEnum
+
+
+class Direction(IntEnum):
+
+    E = 0       # east
+    W = 1       # west
 
 
 class Mesh:
@@ -11,13 +17,14 @@ class Mesh:
         self.length = length
         self.n_cells = n_cells
 
-        # list of outer normal vectors
-        self.outer_normals = [np.array([1.0])]
+        # Outer normal vectors
+        self.outer_normal = {Direction.E: np.array([1.0]),
+                             Direction.W: np.array([-1.0])}
 
         self.cell_boundaries, self.h = np.linspace(
             0.0, length, num=n_cells + 1, endpoint=True, retstep=True)
 
-    def inflow_boundary_cells(self, ordIndex, n_dof):
+    def inflow_boundary(self, ordIndex, n_dof):
 
         cells = []
 
@@ -33,6 +40,24 @@ class Mesh:
             raise Exception('Invalid ordinate index')
 
         return np.array([cells])
+
+    def outflow_boundary_cell(self, cell, ord_index):
+
+        if ord_index == 0:
+
+            if cell == self.n_cells - 1:
+                return True
+
+            else:
+                return False
+
+        elif ord_index == 1:
+
+            if cell == 0:
+                return True
+
+            else:
+                return False
 
     # Compute the L2 scalar product of the absorption coefficient with the
     # basis functions corresponding to each cell. Order 4 gaussian

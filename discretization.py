@@ -2,6 +2,25 @@ import numpy as np
 import scipy.sparse as sps
 
 import mesh
+from mesh import Direction as Dir
+
+
+def upwind_index(sameDirection, cell):
+
+    # orthogonal direction does not matter because
+    # corresponding entry is zero
+    if sameDirection:
+
+        return [cell]
+
+    else:
+
+        return [cell + 1]
+
+
+def centered_index(sameDirection, cell):
+
+    return [cell, cell + 1]
 
 
 class FiniteVolume1d:
@@ -39,7 +58,8 @@ class FiniteVolume1d:
     and matrix vector operations needed in the solvers.
     """
 
-    def __init__(self, mp, n_cells, n_ordinates, do_weights=0):
+    def __init__(self, mp, n_cells, n_ordinates, do_weights=0,
+                 numerical_flux='upwind'):
         """
         Parameters
         ----------
@@ -51,9 +71,13 @@ class FiniteVolume1d:
             Weights for the quadrature of the discrete ordinates
         """
 
+        assert numerical_flux in ['upwind', 'centered'], \
+            'Numerical flux ' + numerical_flux + ' not implemented.'
+
         print('Discretization:\n' +
               '    - number of cells: ' + str(n_cells) + '\n' +
-              '    - number of discrete ordinates: ' + str(n_ordinates) +
+              '    - number of discrete ordinates: ' + str(n_ordinates) + '\n'
+              '    - numerical flux: ' + numerical_flux +
               '\n\n\n')
 
         # --------------------------------------------------------------------
@@ -63,12 +87,12 @@ class FiniteVolume1d:
         # in one dimension there are only two possible discrete ordinates
         self.n_ord = n_ordinates if mp.dim == 2 else 2
 
+        # list of directions of the discrete ordinates
+        self.ord_dir = [np.array([1.0]), np.array([-1.0])]
+
         if mp.dim == 1 and n_ordinates != 2:
             print('Warning: In one dimension two discrete ordinates' +
                   '(+1.0, -1.0) will be used!')
-
-        # list of directions of the discrete ordinates
-        self.ord_dir = [np.array([1.0]), np.array([-1.0])]
 
         # scattering coefficients for the chosen process
         sig = np.zeros((self.n_ord, self.n_ord))
@@ -98,46 +122,37 @@ class FiniteVolume1d:
 
         self.mesh = mesh.Mesh(mp.dom_len, n_cells)
 
+        # TODO: do not store entire array but compute in place when needed
         self.alpha = self.mesh.integrate_cellwise(mp.abs_fun)
-
-        # matrix storing the dot products of relevant outer normals with each
-        # discrete ordinate direction. Entry (m, l) is the dot product of
-        # direction m with outer normal l
-        ndotn = np.dot(self.ord_dir, np.transpose(self.mesh.outer_normals))
 
         # coo-format matrices representing the contributions to the stiffness
         # matrix. By default when converting to CSR or CSC format, duplicate
         # (i,j) entries will be summed together
-        t_data = self.__assemble_transport__(n_cells, ndotn)
+        ta_mat = self.__assemble_transport__(numerical_flux)
         a_data = self.__assemble_absorption__(mp.xip1)
         s_data = self.__assemble_scattering__(sig, n_cells, mp.xi)
 
-        ta_data = [np.concatenate((t_data[r], a_data[r]), axis=0)
-                   for r in range(3)]
+        ta_mat.data = np.concatenate((ta_mat.data, a_data[0]))
+        ta_mat.row = np.concatenate((ta_mat.row, a_data[1]))
+        ta_mat.col = np.concatenate((ta_mat.col, a_data[2]))
 
         if mp.scat == 'none':
 
-            self.stiff_mat = sps.coo_matrix(
-                (ta_data[0], (ta_data[1], ta_data[2])),
-                shape=(self.n_dof, self.n_dof))
-
             self.lambda_prec = sps.csr_matrix((self.n_dof, self.n_dof))
-            self.stiff_mat = self.stiff_mat.tocsr()
+            self.stiff_mat = ta_mat.tocsr()
 
         else:
 
             # concatenate indices and data of transport and scattering part
-            data = [np.concatenate((ta_data[r], s_data[r]), axis=0)
-                    for r in range(3)]
-            # print(ta_data[0].shape, ta_data[1].shape, ta_data[2].shape)
-            self.lambda_prec = sps.coo_matrix((
-                ta_data[0], (ta_data[1], ta_data[2])),
-                shape=(self.n_dof, self.n_dof))
+            data = np.concatenate((ta_mat.data, s_data[0]))
+            row = np.concatenate((ta_mat.row, s_data[1]))
+            col = np.concatenate((ta_mat.col, s_data[2]))
 
-            self.stiff_mat = sps.coo_matrix((data[0], (data[1], data[2])),
+            self.lambda_prec = ta_mat.tocsr()
+
+            self.stiff_mat = sps.coo_matrix((data, (row, col)),
                                             shape=(self.n_dof, self.n_dof))
 
-            self.lambda_prec = self.lambda_prec.tocsr()
             self.stiff_mat = self.stiff_mat.tocsr()
 
         # --------------------------------------------------------------------
@@ -148,56 +163,79 @@ class FiniteVolume1d:
 
         # add boundary conditions
         for m in range(n_ordinates):
-            self.load_vec[self.mesh.inflow_boundary_cells(m, self.n_dof)] += \
+            self.load_vec[self.mesh.inflow_boundary(m, self.n_dof)] += \
                 mp.inflow_bc[m]
 
-    def __assemble_transport__(self, nc, ndotn):
+    def __assemble_transport__(self, num_flux):
 
-        data = []
-        row = []
-        col = []
+        # For the transport part, there is no coupling between
+        # the different ordinates. The corresponding matrix thus
+        # has block diagonal structure.
+        block_diag = []
 
-        def upwind_index(global_index, nn):
+        nfi_fun = upwind_index if num_flux == 'upwind' else centered_index
 
-            if nn < 0.0:
-
-                return global_index
-
-            elif nn > 0.0:
-
-                return global_index - 1
-
-            else:  # value here does not matter
-
-                return 0
-
-        # loop over each degree of freedom
         for m in range(self.n_ord):
-            for i in range(nc):
 
-                global_index = m * nc + i
-                nn = ndotn[m, 0]
+            n_prod = np.dot(self.mesh.outer_normal[Dir.E], self.ord_dir[m])
 
-                if global_index in \
-                        self.mesh.inflow_boundary_cells(m, self.n_dof):
+            def num_flux_index(p): return nfi_fun(n_prod > 0.0, p)
 
-                    row += [global_index]
+            num_flux_value = n_prod if num_flux == 'upwind' else 0.5 * n_prod
 
-                    if nn > 0:
-                        data += [nn]
-                        col += [upwind_index(global_index + 1, nn)]
-                    else:
-                        data += [-nn]
-                        col += [upwind_index(global_index, nn)]
+            row = []
+            col = []
+            data = []
+
+            for p in range(self.mesh.n_cells):
+
+                # first, deal with the domain boudaries
+                # then with the interior cells
+                if p == 0:
+
+                    colIndex = num_flux_index(p)
+
+                    col += [*colIndex]
+                    row += len(colIndex) * [p]
+                    data += len(colIndex) * [num_flux_value]
+
+                    if self.mesh.outflow_boundary_cell(p, m):
+
+                        col += [p]
+                        row += [p]
+                        data += [-n_prod]
+
+                elif p == self.mesh.n_cells - 1:
+
+                    colIndex = num_flux_index(p - 1)
+
+                    col += [*colIndex]
+                    row += len(colIndex) * [p]
+                    data += len(colIndex) * [-num_flux_value]
+
+                    if self.mesh.outflow_boundary_cell(p, m):
+
+                        col += [p]
+                        row += [p]
+                        data += [n_prod]
 
                 else:
 
-                    data += [nn, -nn]
-                    row += [global_index, global_index]
-                    col += [upwind_index(global_index + 1, nn),
-                            upwind_index(global_index, nn)]
+                    colIndex0 = num_flux_index(p)
+                    colIndex1 = num_flux_index(p - 1)
+                    col += [*colIndex0, *colIndex1]
 
-        return np.array(data), np.array(row), np.array(col)
+                    row += len(colIndex0) * [p]
+                    row += len(colIndex1) * [p]
+
+                    data += len(colIndex0) * [num_flux_value]
+                    data += len(colIndex1) * [-num_flux_value]
+
+            block_diag += [sps.coo_matrix(
+                (data, (row, col)),
+                shape=(self.mesh.n_cells, self.mesh.n_cells))]
+
+        return sps.block_diag(block_diag)
 
     def __assemble_absorption__(self, xip1):
 

@@ -52,8 +52,7 @@ class Solver:
             x = spsla.spsolve(A, b)
             elapsed_time = time.process_time() - t
 
-            print("Sparse direct solver ended after " + str(elapsed_time) +
-                  "s")
+            print("Sparse direct solver ended after " + str(elapsed_time) + "s")
 
             return x, None, elapsed_time
 
@@ -102,3 +101,27 @@ class Solver:
                   str(counter.niter)+" iterations in "+str(elapsed_time)+"s")
 
             return x, counter.niter, elapsed_time
+
+        elif self.name == "CG":
+
+            if isinstance(self.preconditioner, LambdaPreconditioner):
+
+                M = self.preconditioner.M
+
+            else:
+
+                M = None
+
+            counter = solve_counter()
+            t = time.process_time()
+
+            x, exit_code = spsla.cg(
+                A=A, b=b, M=M, x0=x_in, callback=counter, tol=1e-8)
+
+            elapsed_time = time.process_time() - t
+
+            print("CG ended with exit code " + str(exit_code)+" after " +
+                  str(counter.niter)+" iterations in "+str(elapsed_time)+"s")
+
+            return x, counter.niter, elapsed_time
+

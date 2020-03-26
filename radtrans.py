@@ -51,6 +51,7 @@ class RadiativeTransfer:
                 'quadratureWeights').split(',')]
 
         self.method = str(config['DISCRETIZATION']['method'])
+        self.flux = str(config['DISCRETIZATION']['flux'])
         self.n_cells = int(config['DISCRETIZATION']['n_cells'])
         self.n_ordinates = int(config['DISCRETIZATION']['n_ordinates'])
 
@@ -73,6 +74,7 @@ class RadiativeTransfer:
         if scattering == 'isotropic':
 
             self.disc = discretization.FiniteVolume1d(
+              generalizedInterface
                 model_problem, self.n_cells, self.n_ordinates,
                 quadrature_weights)
 

@@ -77,6 +77,7 @@ class FiniteVolume1d:
             'Numerical flux ' + numerical_flux + ' not implemented.'
 
         print('Discretization:\n' +
+              '---------------\n' +
               '    - number of discrete ordinates: ' + str(n_ordinates) + '\n'
               '    - numerical flux: ' + numerical_flux +
               '\n\n\n')

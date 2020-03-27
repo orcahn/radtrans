@@ -34,6 +34,7 @@ class Mesh:
                              Direction.W: np.array([-1.0])}
 
         print('Mesh:\n' +
+              '-----\n' +
               '    - domain: (0.0, ' + str(domain_length) + ')\n' +
               '    - number of cells: ' + str(n_cells) +
               '\n\n')

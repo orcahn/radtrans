@@ -1,5 +1,7 @@
 import sys
+import timeit
 import configparser
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -75,7 +77,8 @@ class RadiativeTransfer:
 
         assert(self.method == 'finiteVolume')
 
-        disc = None
+        # time matrix and load vector assembly
+        start_time = timeit.default_timer()
 
         if scattering == 'isotropic':
 
@@ -89,11 +92,28 @@ class RadiativeTransfer:
                 model_problem, self.mesh, n_ordinates, quadrature_weights,
                 flux)
 
+        elapsed_time = timeit.default_timer() - start_time
+        print('Timings:')
+        print('--------')
+        print('Matrix and rhs assembly: ' +
+              "% 10.3e" % (elapsed_time) + ' s')
+
         # define stiffness matrix, load vector, solver and preconditioner
         if preconditioner == 'LambdaIteration':
+
+            # time precoditioner setup
+            start_time = timeit.default_timer()
+
             preconditioner = solver.LambdaPreconditioner(disc)
 
+            elapsed_time = timeit.default_timer() - start_time
+            print('Preconditioner setup:    ' +
+                  "% 10.3e" % (elapsed_time) + ' s')
+
         A, b = disc.stiff_mat, disc.load_vec
+
+        # time initial guess setup
+        start_time = timeit.default_timer()
 
         if initial_guess == "thermalEmission":
 
@@ -114,6 +134,10 @@ class RadiativeTransfer:
         else:
 
             x_in = None
+
+        elapsed_time = timeit.default_timer() - start_time
+        print('Initial guess setup:     ' +
+              "% 10.3e" % (elapsed_time) + ' s')
 
         linear_solver = solver.Solver(solver_name, preconditioner)
 

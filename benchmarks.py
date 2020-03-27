@@ -1,6 +1,4 @@
-import numpy as np
 import configparser
-import time
 
 from radtrans import RadiativeTransfer
 import matplotlib.pyplot as plt
@@ -49,10 +47,10 @@ for precond in ['none', 'LambdaIteration']:
 # execution time benchmarks
 Ns = [10*x for x in [2**j for j in range(11)]]
 
-#for precond in ['NoPreconditioning', 'LambdaIteration']:
+# for precond in ['NoPreconditioning', 'LambdaIteration']:
 for precond in ['LambdaIteration']:
     plt.subplot(2, 2, k)
-    for solver in ['CG','GMRES','BiCGSTAB']:
+    for solver in ['CG', 'GMRES', 'BiCGSTAB']:
         times = []
         for n in Ns:
             config['MODEL'] = {'dimension': '1',
@@ -66,13 +64,13 @@ for precond in ['LambdaIteration']:
                                'quadratureWeights': '1.0,1.0'}
 
             config['DISCRETIZATION'] = {'method': 'finiteVolume',
-                                        'flux' : 'centered',
+                                        'flux': 'centered',
                                         'n_cells': n}
             config['SOLVER'] = {'solver': solver,
                                 'Preconditioner': precond,
                                 'initialGuess': 'thermalEmission'}
 
-            config['OUTPUT'] = {'type' : 'firstOrdinate'}
+            config['OUTPUT'] = {'type': 'firstOrdinate'}
 
             with open('benchmarks.ini', 'w') as configfile:
                 config.write(configfile)

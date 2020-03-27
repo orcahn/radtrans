@@ -57,8 +57,11 @@ class Mesh:
             corresponds to the L2 scalar product of fun with basis function k.
         """
 
-        return np.array([fixed_quad(fun, self.cell_boundaries()[i],
-                                    self.cell_boundaries()[i+1], n=4)[0]
+        boundaries = np.linspace(0.0, self.dom_len, num=self.n_cells + 1,
+                                 endpoint=True, retstep=False)
+
+        return np.array([fixed_quad(fun,
+                                    boundaries[i], boundaries[i+1], n=4)[0]
                          for i in range(self.n_cells)])
 
     def inflow_boundary_cells(self, ordIndex):
@@ -106,11 +109,6 @@ class Mesh:
     def interior_cells(self):
 
         return range(1, self.n_cells - 1)
-
-    def cell_boundaries(self):
-
-        return np.linspace(0.0, self.dom_len, num=self.n_cells + 1,
-                           endpoint=True, retstep=False)
 
     def cell_centers(self):
 

@@ -80,7 +80,7 @@ class FiniteVolume1d:
               '---------------\n' +
               '    - number of discrete ordinates: ' + str(n_ordinates) + '\n'
               '    - numerical flux: ' + numerical_flux +
-              '\n\n\n')
+              '\n\n')
 
         # --------------------------------------------------------------------
         #               DISCRETE ORDINATES AND SCATTERING

@@ -53,7 +53,7 @@ class Solver:
             x = spsla.spsolve(A, b)
             elapsed_time = timeit.default_timer() - start_time
 
-            print('Sparse direct solver ended after ' +
+            print('Sparse direct solver:    ' +
                   "% 10.3e" % (elapsed_time) + ' s')
 
             return x, None, elapsed_time
@@ -69,7 +69,7 @@ class Solver:
                 M = None
 
             counter = solve_counter()
-            t = timeit.default_timer()
+            start_time = timeit.default_timer()
 
             x, exit_code = spsla.gmres(
                 A=A, b=b, M=M, x0=x_in, callback=counter, tol=1e-8)

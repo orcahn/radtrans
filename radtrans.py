@@ -84,7 +84,9 @@ class RadiativeTransfer:
                 model_problem, self.n_cells)
 
         elapsed_time = timeit.default_timer() - start_time
-        print('Matrix and vector assembly took ' +
+        print('Timings:')
+        print('--------')
+        print('Matrix and rhs assembly: ' +
               "% 10.3e" % (elapsed_time) + ' s')
 
         # define stiffness matrix, load vector, solver and preconditioner
@@ -96,7 +98,7 @@ class RadiativeTransfer:
             preconditioner = solver.LambdaPreconditioner(self.disc)
 
             elapsed_time = timeit.default_timer() - start_time
-            print('Preconditioner setup took  ' +
+            print('Preconditioner setup:    ' +
                   "% 10.3e" % (elapsed_time) + ' s')
 
         A, b = self.disc.stiff_mat, self.disc.load_vec
@@ -128,7 +130,7 @@ class RadiativeTransfer:
             x_in = None
 
         elapsed_time = timeit.default_timer() - start_time
-        print('Initial guess setup took ' +
+        print('Initial guess setup:     ' +
               "% 10.3e" % (elapsed_time) + ' s')
 
         linear_solver = solver.Solver(solver_name, preconditioner)

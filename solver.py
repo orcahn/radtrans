@@ -52,8 +52,8 @@ class Solver:
             x = spsla.spsolve(A, b)
             elapsed_time = time.process_time() - t
 
-            print("Sparse direct solver ended after " + str(elapsed_time) +
-                  "s")
+            print('Sparse direct solver ended after ' +
+                  "% 10.3e" % (elapsed_time) + ' s')
 
             return x, None, elapsed_time
 
@@ -75,8 +75,9 @@ class Solver:
 
             elapsed_time = time.process_time() - t
 
-            print("GMRES ended with exit code " + str(exit_code)+" after " +
-                  str(counter.niter)+" iterations in "+str(elapsed_time)+"s")
+            print('GMRES ended with exit code ' + str(exit_code) + ' after ' +
+                  str(counter.niter) + ' iterations in ' +
+                  "% 10.3e" % (elapsed_time) + ' s')
 
             return x, counter.niter, elapsed_time
 
@@ -98,7 +99,8 @@ class Solver:
 
             elapsed_time = time.process_time() - t
 
-            print("BiCGSTAB ended with exit code " + str(exit_code)+" after " +
-                  str(counter.niter)+" iterations in "+str(elapsed_time)+"s")
+            print('BiCGSTAB ended with exit code ' + str(exit_code) +
+                  ' after ' + str(counter.niter) + ' iterations in ' +
+                  "% 10.3e" % (elapsed_time) + ' s')
 
             return x, counter.niter, elapsed_time

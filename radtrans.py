@@ -69,6 +69,7 @@ class RadiativeTransfer:
 
         assert(self.method == 'finiteVolume')
 
+        # time matrix and load vector assembly
         t = time.process_time()
 
         if scattering == 'isotropic':
@@ -82,25 +83,27 @@ class RadiativeTransfer:
                 model_problem, self.n_cells)
 
         elapsed_time = time.process_time() - t
-        print("Matrix and vector assembly took " + str(elapsed_time) +
-                  "s")
+        print('Matrix and vector assembly took ' +
+              "% 10.3e" % (elapsed_time) + ' s')
 
         # define stiffness matrix, load vector, solver and preconditioner
         if preconditioner == 'LambdaIteration':
 
+            # time precoditioner setup
             t = time.process_time()
 
             preconditioner = solver.LambdaPreconditioner(self.disc)
 
             elapsed_time = time.process_time() - t
-            print("Setting up Lambda preconditioner took " + str(elapsed_time) +
-                  "s")
+            print('Preconditioner setup took  ' +
+                  "% 10.3e" % (elapsed_time) + ' s')
 
         A, b = self.disc.stiff_mat, self.disc.load_vec
 
         self.dom = np.arange(
             0.5 * self.disc.h, self.n_cells * self.disc.h, self.disc.h)
 
+        # time initial guess setup
         t = time.process_time()
 
         if initial_guess == "thermalEmission":
@@ -124,8 +127,8 @@ class RadiativeTransfer:
             x_in = None
 
         elapsed_time = time.process_time() - t
-        print("Setting up initial guess took " + str(elapsed_time) +
-                  "s")
+        print('Initial guess setup took ' +
+              "% 10.3e" % (elapsed_time) + ' s')
 
         linear_solver = solver.Solver(solver_name, preconditioner)
 

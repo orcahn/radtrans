@@ -173,10 +173,12 @@ class FiniteVolume1d:
         # has block diagonal structure.
         block_diag = []
 
+        # numerical flux index function
         nfi_fun = upwind_index if num_flux == 'upwind' else centered_index
 
         for m in range(self.n_ord):
 
+            # scalar product of ordinate direction m with Direction E
             n_prod = np.dot(mesh.outer_normal[Dir.E], self.ord_dir[m])
 
             def num_flux_index(p): return nfi_fun(n_prod > 0.0, p)
@@ -190,53 +192,54 @@ class FiniteVolume1d:
             col = []
             data = []
 
-            for p in range(mesh.n_cells):
+            # Loop over boundary cells
+            for boundary in mesh.outer_normal:
 
-                # first, deal with the domain boudaries
-                # then with the interior cells
-                if p == 0:
+                for p in mesh.boundary_cells(boundary):
 
-                    colIndex = num_flux_index(p)
+                    if p == 0:
 
-                    col += colIndex
-                    row += len(colIndex) * [p]
-                    data += num_flux_value
+                        colIndex = num_flux_index(p)
 
-                    if mesh.outflow_boundary_cell(p, m):
+                        col += colIndex
+                        row += len(colIndex) * [p]
+                        data += num_flux_value
 
-                        col += [p]
-                        row += [p]
-                        data += [-n_prod]
+                        if mesh.outflow_boundary_cell(p, m):
 
-                elif p == mesh.n_cells - 1:
+                            col += [p]
+                            row += [p]
+                            data += [-n_prod]
 
-                    colIndex = num_flux_index(p - 1)
+                    if p == mesh.n_cells - 1:
 
-                    col += colIndex
-                    row += len(colIndex) * [p]
-                    data += [-value for value in num_flux_value]
+                        colIndex = num_flux_index(p - 1)
 
-                    if mesh.outflow_boundary_cell(p, m):
+                        col += colIndex
+                        row += len(colIndex) * [p]
+                        data += [-value for value in num_flux_value]
 
-                        col += [p]
-                        row += [p]
-                        data += [n_prod]
+                        if mesh.outflow_boundary_cell(p, m):
 
-                else:
+                            col += [p]
+                            row += [p]
+                            data += [n_prod]
 
-                    colIndex0 = num_flux_index(p)
-                    colIndex1 = num_flux_index(p - 1)
-                    col += colIndex0 + colIndex1
+            # Loop over interior cells
+            for p in mesh.interior_cells():
 
-                    row += len(colIndex0) * [p]
-                    row += len(colIndex1) * [p]
+                colIndex0 = num_flux_index(p)
+                colIndex1 = num_flux_index(p - 1)
+                col += colIndex0 + colIndex1
 
-                    data += num_flux_value
-                    data += [-value for value in num_flux_value]
+                row += len(colIndex0) * [p]
+                row += len(colIndex1) * [p]
 
-            block_diag += [sps.coo_matrix(
-                (data, (row, col)),
-                shape=(mesh.n_cells, mesh.n_cells))]
+                data += num_flux_value
+                data += [-value for value in num_flux_value]
+
+            block_diag += [sps.coo_matrix((data, (row, col)),
+                                          shape=(mesh.n_cells, mesh.n_cells))]
 
         return sps.block_diag(block_diag)
 

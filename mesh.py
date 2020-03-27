@@ -25,14 +25,13 @@ class Mesh:
             Number of cells, the domain is to be partitioned into.
         """
 
+        self.dom_len = domain_length
         self.n_cells = n_cells
+        self.h = domain_length / float(n_cells)
 
         # Outer normal vectors
         self.outer_normal = {Direction.E: np.array([1.0]),
                              Direction.W: np.array([-1.0])}
-
-        self.cell_boundaries, self.h = np.linspace(
-            0.0, domain_length, num=n_cells + 1, endpoint=True, retstep=True)
 
         print('Mesh:\n' +
               '    - domain: (0.0, ' + str(domain_length) + ')\n' +
@@ -95,9 +94,29 @@ class Mesh:
             corresponds to the L2 scalar product of fun with basis function k.
         """
 
-        return np.array([fixed_quad(
-            fun, self.cell_boundaries[i], self.cell_boundaries[i+1], n=4)[0]
-            for i in range(self.n_cells)])
+        return np.array([fixed_quad(fun, self.cell_boundaries()[i],
+                                    self.cell_boundaries()[i+1], n=4)[0]
+                         for i in range(self.n_cells)])
+
+    def boundary_cells(self, direction):
+
+        if direction == Direction.E:
+            return range(self.n_cells - 1, self.n_cells)
+
+        elif direction == Direction.W:
+            return range(1)
+
+        else:
+            return range(0)
+
+    def interior_cells(self):
+
+        return range(1, self.n_cells - 1)
+
+    def cell_boundaries(self):
+
+        return np.linspace(0.0, self.dom_len, num=self.n_cells + 1,
+                           endpoint=True, retstep=False)
 
     def cell_centers(self):
 

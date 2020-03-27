@@ -181,6 +181,7 @@ class FiniteVolume1d:
             self.lambda_prec = self.lambda_prec.tocsr()
             t1 = timeit.default_timer() - t0
             print('stiffness matrix: ' + "% 10.3e" % (t1))
+
         # --------------------------------------------------------------------
         #                       LOAD VECTOR ASSEMBLY
         # --------------------------------------------------------------------

@@ -1,7 +1,6 @@
 import numpy as np
 
 from enum import IntEnum
-from scipy.integrate import fixed_quad
 
 
 class Direction(IntEnum):
@@ -42,8 +41,7 @@ class Mesh:
     def integrate_cellwise(self, fun):
         """
         Compute the L2 scalar product of a function with the basis functions
-        corresponding to each cell. Order 4 gaussian quadrature is used, which
-        translates to 2 quadrature nodes per cell.
+        corresponding to each cell.
 
         Parameters
         ----------
@@ -57,11 +55,16 @@ class Mesh:
             corresponds to the L2 scalar product of fun with basis function k.
         """
 
+        # In a typical application, cell sizes are so small that midpoint
+        # rule is of acceptable accuracy. Tests showed, that higher order
+        # methods did not significantly improve accuracy, but imposed a
+        # high performance overhead.
+        def midpoint(fun, a, b): return self.h * fun(0.5 * (a + b))
+
         boundaries = np.linspace(0.0, self.dom_len, num=self.n_cells + 1,
                                  endpoint=True, retstep=False)
 
-        return np.array([fixed_quad(fun,
-                                    boundaries[i], boundaries[i+1], n=4)[0]
+        return np.array([midpoint(fun, boundaries[i], boundaries[i + 1])
                          for i in range(self.n_cells)])
 
     def inflow_boundary_cells(self, ordIndex):

@@ -1,7 +1,7 @@
 import numpy as np
 
-from scipy.integrate import fixed_quad
 from enum import IntEnum
+from scipy.integrate import fixed_quad
 
 
 class Direction(IntEnum):
@@ -39,44 +39,6 @@ class Mesh:
               '    - number of cells: ' + str(n_cells) +
               '\n\n')
 
-    def inflow_boundary(self, ordIndex, n_dof):
-
-        cells = []
-
-        if ordIndex == 0:
-
-            cells += [0]
-
-        elif ordIndex == 1:
-
-            cells += [n_dof - 1]
-
-        else:
-            raise Exception('Invalid ordinate index')
-
-        return np.array([cells])
-
-    def outflow_boundary_cell(self, cell, ord_index):
-
-        if ord_index == 0:
-
-            if cell == self.n_cells - 1:
-                return True
-
-            else:
-                return False
-
-        elif ord_index == 1:
-
-            if cell == 0:
-                return True
-
-            else:
-                return False
-
-    # Compute the L2 scalar product of the absorption coefficient with the
-    # basis functions corresponding to each cell. Order 4 gaussian
-    # quadrature is used, which translates to 2 quadrature nodes per cell.
     def integrate_cellwise(self, fun):
         """
         Compute the L2 scalar product of a function with the basis functions
@@ -98,6 +60,37 @@ class Mesh:
         return np.array([fixed_quad(fun, self.cell_boundaries()[i],
                                     self.cell_boundaries()[i+1], n=4)[0]
                          for i in range(self.n_cells)])
+
+    def inflow_boundary_cells(self, ordIndex):
+
+        if ordIndex == 0:
+
+            return [0]
+
+        elif ordIndex == 1:
+
+            return [-1]
+
+        else:
+            raise Exception('Invalid ordinate index')
+
+    def is_outflow_boundary_cell(self, cell, ord_index):
+
+        if ord_index == 0:
+
+            if cell == self.n_cells - 1:
+                return True
+
+            else:
+                return False
+
+        elif ord_index == 1:
+
+            if cell == 0:
+                return True
+
+            else:
+                return False
 
     def boundary_cells(self, direction):
 

@@ -1,3 +1,5 @@
+import timeit
+
 import numpy as np
 import scipy.sparse as sps
 
@@ -81,7 +83,7 @@ class FiniteVolume1d:
         # --------------------------------------------------------------------
         #               DISCRETE ORDINATES AND SCATTERING
         # --------------------------------------------------------------------
-
+        t0 = timeit.default_timer()
         # in one dimension there are only two possible discrete ordinates
         self.n_ord = n_ordinates if mp.dim == 2 else 2
 
@@ -112,19 +114,30 @@ class FiniteVolume1d:
                 for j in range(self.n_ord):
                     sig[i, j] = do_weights[i] * scat_prob
 
+        t1 = timeit.default_timer() - t0
+        print('scattering coefficients: ' + "% 10.3e" % (t1))
         # --------------------------------------------------------------------
         #               MESH GENERATION AND MATRIX ASSEMBLY
         # --------------------------------------------------------------------
 
         self.n_dof = self.n_ord * mesh.n_cells
 
+        t0 = timeit.default_timer()
         alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun),
                               reps=self.n_ord)
+        t1 = timeit.default_timer() - t0
+        print('alpha: ' + "% 10.3e" % (t1))
 
         # coo-format matrices representing the contributions to the stiffness
         # matrix.
+        t0 = timeit.default_timer()
         t_mat = self.__assemble_transport__(mesh, numerical_flux)
+        t1 = timeit.default_timer() - t0
+        print('transport: ' + "% 10.3e" % (t1))
+        t0 = timeit.default_timer()
         a_mat = self.__assemble_absorption__(mesh, alpha_tiled, mp.xip1)
+        t1 = timeit.default_timer() - t0
+        print('absorption: ' + "% 10.3e" % (t1))
 
         if mp.scat == 'none':
 
@@ -140,10 +153,13 @@ class FiniteVolume1d:
                 shape=(self.n_dof, self.n_dof)).tocsr()
 
         else:
-
+            t0 = timeit.default_timer()
             s_mat = self.__assemble_scattering__(
                 mesh, alpha_tiled[:mesh.n_cells], sig, mp.xi)
+            t1 = timeit.default_timer() - t0
+            print('scattering: ' + "% 10.3e" % (t1))
 
+            t0 = timeit.default_timer()
             # Combine transport and absorption parts. By default
             # when converting to CSR or CSC format, duplicate
             # (i,j) entries will be summed together
@@ -152,7 +168,10 @@ class FiniteVolume1d:
                 (np.concatenate((t_mat.row, a_mat.row)),
                  np.concatenate((t_mat.col, a_mat.col)))),
                 shape=(self.n_dof, self.n_dof))
+            t1 = timeit.default_timer() - t0
+            print('preconditioner: ' + "% 10.3e" % (t1))
 
+            t0 = timeit.default_timer()
             self.stiff_mat = sps.coo_matrix((
                 np.concatenate((self.lambda_prec.data, s_mat.data)),
                 (np.concatenate((self.lambda_prec.row, s_mat.row)),
@@ -160,17 +179,21 @@ class FiniteVolume1d:
                 shape=(self.n_dof, self.n_dof)).tocsr()
 
             self.lambda_prec = self.lambda_prec.tocsr()
-
+            t1 = timeit.default_timer() - t0
+            print('stiffness matrix: ' + "% 10.3e" % (t1))
         # --------------------------------------------------------------------
         #                       LOAD VECTOR ASSEMBLY
         # --------------------------------------------------------------------
-
+        t0 = timeit.default_timer()
         self.load_vec = mp.emiss * mp.s_e * alpha_tiled
 
         # add boundary conditions
         for m in range(n_ordinates):
             self.load_vec[mesh.inflow_boundary_cells(m)] += \
                 mp.inflow_bc[m]
+
+        t1 = timeit.default_timer() - t0
+        print('load vector: ' + "% 10.3e" % (t1) + '\n')
 
     def __assemble_transport__(self, mesh, num_flux):
 

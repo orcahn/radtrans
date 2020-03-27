@@ -37,10 +37,6 @@ class FiniteVolume1d:
         Length of a single cell.
     mesh : one-dimensional np.ndarray
         Uniform mesh used for the FV discretization.
-    alpha : one-dimensional np.ndarray
-        Array with same number of entries as there are cells. The entries
-        consist of the L2 scalar product of the absorption coefficient with
-        the basis function corresponding to the cell in the mesh.
     stiff_mat : scipy.sparse.csr.csr_matrix
         Sparse stiffness matrix of the system.
     lambda_prec : scipy.sparse.csr.csr_matrix
@@ -122,49 +118,58 @@ class FiniteVolume1d:
 
         self.n_dof = self.n_ord * mesh.n_cells
 
-        # TODO: do not store entire array but compute in place when needed
-        self.alpha = mesh.integrate_cellwise(mp.abs_fun)
+        alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun),
+                              reps=self.n_ord)
 
         # coo-format matrices representing the contributions to the stiffness
         # matrix.
-        ta_mat = self.__assemble_transport__(mesh, numerical_flux)
-        a_data = self.__assemble_absorption__(mp.xip1)
-        s_data = self.__assemble_scattering__(sig, mesh.n_cells, mp.xi)
-
-        # By default when converting to CSR or CSC format, duplicate
-        # (i,j) entries will be summed together
-        ta_mat.data = np.concatenate((ta_mat.data, a_data[0]))
-        ta_mat.row = np.concatenate((ta_mat.row, a_data[1]))
-        ta_mat.col = np.concatenate((ta_mat.col, a_data[2]))
+        t_mat = self.__assemble_transport__(mesh, numerical_flux)
+        a_mat = self.__assemble_absorption__(mesh, alpha_tiled, mp.xip1)
 
         if mp.scat == 'none':
 
-            self.lambda_prec = sps.csr_matrix((self.n_dof, self.n_dof))
-            self.stiff_mat = ta_mat.tocsr()
+            self.lambda_prec = None
+
+            # Combine transport and absorption parts. By default
+            # when converting to CSR or CSC format, duplicate
+            # (i,j) entries will be summed together
+            self.stiff_mat = sps.coo_matrix((
+                np.concatenate((t_mat.data, a_mat.data)),
+                (np.concatenate((t_mat.row, a_mat.row)),
+                 np.concatenate((t_mat.col, a_mat.col)))),
+                shape=(self.n_dof, self.n_dof)).tocsr()
 
         else:
 
-            # concatenate indices and data of transport and scattering part
-            data = np.concatenate((ta_mat.data, s_data[0]))
-            row = np.concatenate((ta_mat.row, s_data[1]))
-            col = np.concatenate((ta_mat.col, s_data[2]))
+            s_mat = self.__assemble_scattering__(
+                mesh, alpha_tiled[:mesh.n_cells], sig, mp.xi)
 
-            self.lambda_prec = ta_mat.tocsr()
+            # Combine transport and absorption parts. By default
+            # when converting to CSR or CSC format, duplicate
+            # (i,j) entries will be summed together
+            self.lambda_prec = sps.coo_matrix((
+                np.concatenate((t_mat.data, mp.xip1 * a_mat.data)),
+                (np.concatenate((t_mat.row, a_mat.row)),
+                 np.concatenate((t_mat.col, a_mat.col)))),
+                shape=(self.n_dof, self.n_dof))
 
-            self.stiff_mat = sps.coo_matrix((data, (row, col)),
-                                            shape=(self.n_dof, self.n_dof))
+            self.stiff_mat = sps.coo_matrix((
+                np.concatenate((self.lambda_prec.data, s_mat.data)),
+                (np.concatenate((self.lambda_prec.row, s_mat.row)),
+                 np.concatenate((self.lambda_prec.col, s_mat.col)))),
+                shape=(self.n_dof, self.n_dof)).tocsr()
 
-            self.stiff_mat = self.stiff_mat.tocsr()
+            self.lambda_prec = self.lambda_prec.tocsr()
 
         # --------------------------------------------------------------------
         #                       LOAD VECTOR ASSEMBLY
         # --------------------------------------------------------------------
 
-        self.load_vec = np.tile(mp.emiss * mp.s_e * self.alpha, reps=2)
+        self.load_vec = mp.emiss * mp.s_e * alpha_tiled
 
         # add boundary conditions
         for m in range(n_ordinates):
-            self.load_vec[mesh.inflow_boundary(m, self.n_dof)] += \
+            self.load_vec[mesh.inflow_boundary_cells(m)] += \
                 mp.inflow_bc[m]
 
     def __assemble_transport__(self, mesh, num_flux):
@@ -206,7 +211,7 @@ class FiniteVolume1d:
                         row += len(colIndex) * [p]
                         data += num_flux_value
 
-                        if mesh.outflow_boundary_cell(p, m):
+                        if mesh.is_outflow_boundary_cell(p, m):
 
                             col += [p]
                             row += [p]
@@ -220,7 +225,7 @@ class FiniteVolume1d:
                         row += len(colIndex) * [p]
                         data += [-value for value in num_flux_value]
 
-                        if mesh.outflow_boundary_cell(p, m):
+                        if mesh.is_outflow_boundary_cell(p, m):
 
                             col += [p]
                             row += [p]
@@ -244,26 +249,29 @@ class FiniteVolume1d:
 
         return sps.block_diag(block_diag)
 
-    def __assemble_absorption__(self, xip1):
+    def __assemble_absorption__(self, mesh, alpha_tiled, xip1):
 
-        data = np.tile(xip1 * self.alpha, reps=2)
-        row = np.arange(float(self.n_dof))
-        col = row
+        # for the pure absorption part, there is neither a coupling between
+        # neighbouring cells nor between different ordinates, the the resulting
+        # matrix is diagonal.
+        return sps.diags(alpha_tiled, format='coo',
+                         shape=(self.n_dof, self.n_dof))
 
-        return data, row, col
+    def __assemble_scattering__(self, mesh, alpha, sig, xi):
 
-    def __assemble_scattering__(self, sig, nc, xi):
+        # For the scattering part there is no coupling between
+        # neighbouring cells, however there is coupling between
+        # one ordinate and all others. Thus, the corresponding
+        # matrix consists of blocks of diagonal matrices.
+        blocks = []
 
-        data = np.concatenate((-xi * sig[0, 0] * self.alpha,
-                               -xi * sig[0, 1] * self.alpha,
-                               -xi * sig[1, 0] * self.alpha,
-                               -xi * sig[1, 1] * self.alpha))
+        for m in range(self.n_ord):
 
-        row = np.tile(np.arange(float(nc)), reps=self.n_ord * self.n_ord)
+            block_row = []
 
-        col = np.concatenate((np.arange(float(nc)),
-                              np.arange(float(nc)) + nc,
-                              np.arange(float(nc)),
-                              np.arange(float(nc)) + nc), axis=0)
+            for n in range(self.n_ord):
+                block_row += [sps.diags(-xi * sig[m, n] * alpha, format='coo')]
 
-        return data, row, col
+            blocks += [block_row]
+
+        return sps.bmat(blocks, format='coo')

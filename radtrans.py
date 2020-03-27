@@ -1,6 +1,7 @@
 import sys
-import time
+import timeit
 import configparser
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -70,7 +71,7 @@ class RadiativeTransfer:
         assert(self.method == 'finiteVolume')
 
         # time matrix and load vector assembly
-        t = time.process_time()
+        start_time = timeit.default_timer()
 
         if scattering == 'isotropic':
 
@@ -82,7 +83,7 @@ class RadiativeTransfer:
             self.disc = discretization.FiniteVolume1d(
                 model_problem, self.n_cells)
 
-        elapsed_time = time.process_time() - t
+        elapsed_time = timeit.default_timer() - start_time
         print('Matrix and vector assembly took ' +
               "% 10.3e" % (elapsed_time) + ' s')
 
@@ -90,11 +91,11 @@ class RadiativeTransfer:
         if preconditioner == 'LambdaIteration':
 
             # time precoditioner setup
-            t = time.process_time()
+            start_time = timeit.default_timer()
 
             preconditioner = solver.LambdaPreconditioner(self.disc)
 
-            elapsed_time = time.process_time() - t
+            elapsed_time = timeit.default_timer() - start_time
             print('Preconditioner setup took  ' +
                   "% 10.3e" % (elapsed_time) + ' s')
 
@@ -104,7 +105,7 @@ class RadiativeTransfer:
             0.5 * self.disc.h, self.n_cells * self.disc.h, self.disc.h)
 
         # time initial guess setup
-        t = time.process_time()
+        start_time = timeit.default_timer()
 
         if initial_guess == "thermalEmission":
 
@@ -126,7 +127,7 @@ class RadiativeTransfer:
 
             x_in = None
 
-        elapsed_time = time.process_time() - t
+        elapsed_time = timeit.default_timer() - start_time
         print('Initial guess setup took ' +
               "% 10.3e" % (elapsed_time) + ' s')
 

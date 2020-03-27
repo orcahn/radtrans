@@ -1,4 +1,5 @@
-import time
+import timeit
+
 import scipy.sparse.linalg as spsla
 
 
@@ -47,10 +48,10 @@ class Solver:
 
         if self.name == "SparseDirect":
 
-            t = time.process_time()
+            start_time = timeit.default_timer()
 
             x = spsla.spsolve(A, b)
-            elapsed_time = time.process_time() - t
+            elapsed_time = timeit.default_timer() - start_time
 
             print('Sparse direct solver ended after ' +
                   "% 10.3e" % (elapsed_time) + ' s')
@@ -68,12 +69,12 @@ class Solver:
                 M = None
 
             counter = solve_counter()
-            t = time.process_time()
+            t = timeit.default_timer()
 
             x, exit_code = spsla.gmres(
                 A=A, b=b, M=M, x0=x_in, callback=counter, tol=1e-8)
 
-            elapsed_time = time.process_time() - t
+            elapsed_time = timeit.default_timer() - start_time
 
             print('GMRES ended with exit code ' + str(exit_code) + ' after ' +
                   str(counter.niter) + ' iterations in ' +
@@ -92,12 +93,12 @@ class Solver:
                 M = None
 
             counter = solve_counter()
-            t = time.process_time()
+            start_time = timeit.default_timer()
 
             x, exit_code = spsla.bicgstab(
                 A=A, b=b, M=M, x0=x_in, callback=counter, tol=1e-8)
 
-            elapsed_time = time.process_time() - t
+            elapsed_time = timeit.default_timer() - start_time
 
             print('BiCGSTAB ended with exit code ' + str(exit_code) +
                   ' after ' + str(counter.niter) + ' iterations in ' +

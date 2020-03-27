@@ -60,7 +60,12 @@ class RadiativeTransfer:
         flux = str(config['DISCRETIZATION']['flux'])
 
         solver_name = str(config['SOLVER']['solver'])
+        assert solver_name in ['SparseDirect', 'GMRES', 'BiCGSTAB'], \
+            'Solver ' + solver_name + ' not implemented.'
+
         initial_guess = str(config['SOLVER']['initialGuess'])
+        assert initial_guess in ['thermalEmission', 'noScattering'], \
+            'Initial guess ' + initial_guess + ' unknown.'
 
         preconditioner = str(config['SOLVER']['Preconditioner'])
         assert preconditioner in ['none', 'LambdaIteration'], \
@@ -98,46 +103,51 @@ class RadiativeTransfer:
         print('Matrix and rhs assembly: ' +
               "% 10.3e" % (elapsed_time) + ' s')
 
-        # define stiffness matrix, load vector, solver and preconditioner
-        if preconditioner == 'LambdaIteration':
+        x_in = None
 
-            # time precoditioner setup
+        if not solver_name == 'SparseDirect':
+
+            # define stiffness matrix, load vector, solver and preconditioner
+            if preconditioner == 'LambdaIteration':
+
+                # time precoditioner setup
+                start_time = timeit.default_timer()
+
+                preconditioner = solver.LambdaPreconditioner(disc)
+
+                elapsed_time = timeit.default_timer() - start_time
+                print('Preconditioner setup:    ' +
+                      "% 10.3e" % (elapsed_time) + ' s')
+
+            # time initial guess setup
             start_time = timeit.default_timer()
 
-            preconditioner = solver.LambdaPreconditioner(disc)
+            if initial_guess == "thermalEmission":
+
+                x_in = np.full(disc.n_dof, model_problem.s_e)
+
+            elif initial_guess == "noScattering":
+
+                sol1 = model_problem.inflow_bc[0] * \
+                    np.exp(-self.mesh.cell_centers()) + model_problem.s_e * \
+                    (1 - np.exp(-self.mesh.cell_centers()))
+
+                sol2 = model_problem.inflow_bc[1] * \
+                    np.exp(-self.mesh.cell_centers()[::-1]) + \
+                    model_problem.s_e * \
+                    (1 - np.exp(-self.mesh.cell_centers()[::-1]))
+
+                x_in = np.concatenate((sol1, sol2), axis=0)
+
+            else:
+
+                x_in = None
 
             elapsed_time = timeit.default_timer() - start_time
-            print('Preconditioner setup:    ' +
+            print('Initial guess setup:     ' +
                   "% 10.3e" % (elapsed_time) + ' s')
 
         A, b = disc.stiff_mat, disc.load_vec
-
-        # time initial guess setup
-        start_time = timeit.default_timer()
-
-        if initial_guess == "thermalEmission":
-
-            x_in = np.full(disc.n_dof, model_problem.s_e)
-
-        elif initial_guess == "noScattering":
-
-            sol1 = model_problem.inflow_bc[0] * \
-                np.exp(-self.mesh.cell_centers()) + model_problem.s_e * \
-                (1 - np.exp(-self.mesh.cell_centers()))
-
-            sol2 = model_problem.inflow_bc[1] * \
-                np.exp(-self.mesh.cell_centers()[::-1]) + model_problem.s_e * \
-                (1 - np.exp(-self.mesh.cell_centers()[::-1]))
-
-            x_in = np.concatenate((sol1, sol2), axis=0)
-
-        else:
-
-            x_in = None
-
-        elapsed_time = timeit.default_timer() - start_time
-        print('Initial guess setup:     ' +
-              "% 10.3e" % (elapsed_time) + ' s')
 
         linear_solver = solver.Solver(solver_name, preconditioner)
 

@@ -219,10 +219,10 @@ class FiniteVolumeDiffusion1d:
         ta_off = None
         ta_diag_blocks = []
 
-        ta_main = np.array([ - (1 / (mp.xip1 * mp.abs_fun(k*self.h)) + 1 / (mp.xip1 * mp.abs_fun((k+1)*self.h))) - self.alpha[k]
+        ta_main = np.array([ - 1./(3. * self.h) * (1 / (mp.xip1 * mp.abs_fun(k*self.h)) + 1 / (mp.xip1 * mp.abs_fun((k+1)*self.h))) - self.alpha[k]
                                 for k in range(n_cells)])
 
-        ta_off = np.array([1 / (mp.xip1 * mp.abs_fun(k*self.h)) for k in range(1,n_cells)])
+        ta_off = np.array([ 1./(3. * self.h) * 1 / (mp.xip1 * mp.abs_fun(k*self.h)) for k in range(1,n_cells)])
 
         ta_diag_blocks += [sps.diags([ta_main, ta_off, ta_off],
                                                 [0, 1, -1],
@@ -230,7 +230,7 @@ class FiniteVolumeDiffusion1d:
 
         # explicit representation of preconditioner used in the
         # lambda iteration
-        self.lambda_prec = 1./(3. * self.h) * sps.block_diag(ta_diag_blocks, format='csr')
+        self.lambda_prec = sps.block_diag(ta_diag_blocks, format='csr')
         self.stiff_mat = self.lambda_prec
 
         self.load_vec = -1. * np.array([mp.s_eps * self.alpha[m]

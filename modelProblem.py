@@ -96,6 +96,7 @@ class ModelProblem1d:
         self.inflow_bc = inflow_bc
 
         print('\n\nModel problem:\n' +
+              '--------------\n' +
               '    - dimension: 1\n' +
               '    - domain: (0,' + str(domain_len) + ')\n' +
               '    - temperature: ' + str(temperature) + ' K\n' +

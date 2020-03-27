@@ -44,8 +44,10 @@ class FiniteVolume1d:
             Weights for the quadrature of the discrete ordinates
         """
         print('Discretization:\n' +
+              '---------------\n' +
               '    - number of cells: ' + str(n_cells) + '\n' +
-              '    - numerical flux function used: ' + numericalFlux + '\n\n\n')
+              '    - numerical flux function used: ' + numericalFlux +
+              '\n\n\n')
 
         self.n_ord = 2
         self.n_dof = self.n_ord * n_cells

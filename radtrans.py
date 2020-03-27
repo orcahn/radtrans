@@ -1,5 +1,7 @@
 import sys
+import timeit
 import configparser
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -50,7 +52,6 @@ class RadiativeTransfer:
                 'quadratureWeights').split(',')]
 
         self.method = str(config['DISCRETIZATION']['method'])
-        self.flux = str(config['DISCRETIZATION']['flux'])
         self.n_cells = int(config['DISCRETIZATION']['n_cells'])
 
         solver_name = str(config['SOLVER']['solver'])
@@ -69,24 +70,44 @@ class RadiativeTransfer:
 
         assert(self.method == 'finiteVolume')
 
+        # time matrix and load vector assembly
+        start_time = timeit.default_timer()
+
         if scattering == 'isotropic':
 
             self.disc = discretization.FiniteVolume1d(
-                model_problem, self.n_cells, quadrature_weights, self.flux)
+                model_problem, self.n_cells, quadrature_weights)
 
         else:
 
             self.disc = discretization.FiniteVolume1d(
-                model_problem, self.n_cells, 0, self.flux)
+                model_problem, self.n_cells)
+
+        elapsed_time = timeit.default_timer() - start_time
+        print('Timings:')
+        print('--------')
+        print('Matrix and rhs assembly: ' +
+              "% 10.3e" % (elapsed_time) + ' s')
 
         # define stiffness matrix, load vector, solver and preconditioner
         if preconditioner == 'LambdaIteration':
+
+            # time precoditioner setup
+            start_time = timeit.default_timer()
+
             preconditioner = solver.LambdaPreconditioner(self.disc)
+
+            elapsed_time = timeit.default_timer() - start_time
+            print('Preconditioner setup:    ' +
+                  "% 10.3e" % (elapsed_time) + ' s')
 
         A, b = self.disc.stiff_mat, self.disc.load_vec
 
         self.dom = np.arange(
             0.5 * self.disc.h, self.n_cells * self.disc.h, self.disc.h)
+
+        # time initial guess setup
+        start_time = timeit.default_timer()
 
         if initial_guess == "thermalEmission":
 
@@ -107,6 +128,10 @@ class RadiativeTransfer:
         else:
 
             x_in = None
+
+        elapsed_time = timeit.default_timer() - start_time
+        print('Initial guess setup:     ' +
+              "% 10.3e" % (elapsed_time) + ' s')
 
         linear_solver = solver.Solver(solver_name, preconditioner)
 

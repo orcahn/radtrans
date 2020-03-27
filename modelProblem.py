@@ -33,8 +33,6 @@ class ModelProblem:
         alpha_scat = xi * alpha_abs.
     xip1 : float
         The value of xi + 1.0, stored for conveniency.
-    dom_len : float
-        Length of the one-dimensional domain.
     inflow_bc : tuple of length 2
         Boundary conditions for the inflow boundaries of the corresponding
         discrete ordinates.
@@ -44,7 +42,7 @@ class ModelProblem:
     """
 
     def __init__(self, dimension, temperature, frequency, albedo, emissivity,
-                 scattering, absorption_fun, domain_len, inflow_bc):
+                 scattering, absorption_fun, inflow_bc):
         """
         Parameters
         ----------
@@ -64,9 +62,6 @@ class ModelProblem:
             Type of scattering process assumed for the medium
         absorption_fun : callable
             Absorption coefficient assumed for the medium.
-        domain_len : float
-            Length of the one-dimensional domain. The domain itself is then
-            defined as D = (0, dom_len).
         inflow_bc : tuple of length 2
             Boundary conditions for the inflow boundaries of the corresponding
             discrete ordinates. In one dimension there are exactly two
@@ -105,9 +100,6 @@ class ModelProblem:
             ' in the domain as argument.'
         self.abs_fun = absorption_fun
 
-        assert domain_len > 0, 'Invalid domain length. Must be positive.'
-        self.dom_len = domain_len
-
         assert len(inflow_bc) == 2, \
             'Invalid inflow boundary conditions.' + \
             'For a 1d problem there must be exactly 2 conditions.'
@@ -115,10 +107,9 @@ class ModelProblem:
 
         print('\n\nModel problem:\n' +
               '    - dimension: 1\n' +
-              '    - domain: (0,' + str(domain_len) + ')\n' +
               '    - temperature: ' + str(temperature) + ' K\n' +
               '    - frequency: ' + str(frequency/1e12) + ' THz\n' +
               '    - s_e: ' + str(self.s_e) + '\n' +
               '    - albedo: ' + str(albedo) + '\n' +
               '    - emissivity: ' + str(emissivity) + '\n' +
-              '    - isotropic scattering\n\n\n')
+              '    - isotropic scattering\n\n')

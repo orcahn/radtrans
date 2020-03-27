@@ -8,13 +8,23 @@ class Direction(IntEnum):
 
     E = 0       # east
     W = 1       # west
+    N = 2       # north
+    S = 3       # south
 
 
 class Mesh:
 
-    def __init__(self, length, n_cells):
+    def __init__(self, domain_length, n_cells):
+        """
+        Parameters
+        ----------
+        domain_length : float
+            Length of the one-dimensional domain. The domain itself is then
+            defined as D = (0, dom_len).
+        n_cells : integer
+            Number of cells, the domain is to be partitioned into.
+        """
 
-        self.length = length
         self.n_cells = n_cells
 
         # Outer normal vectors
@@ -22,7 +32,12 @@ class Mesh:
                              Direction.W: np.array([-1.0])}
 
         self.cell_boundaries, self.h = np.linspace(
-            0.0, length, num=n_cells + 1, endpoint=True, retstep=True)
+            0.0, domain_length, num=n_cells + 1, endpoint=True, retstep=True)
+
+        print('Mesh:\n' +
+              '    - domain: (0.0, ' + str(domain_length) + ')\n' +
+              '    - number of cells: ' + str(n_cells) +
+              '\n\n')
 
     def inflow_boundary(self, ordIndex, n_dof):
 
@@ -83,3 +98,7 @@ class Mesh:
         return np.array([fixed_quad(
             fun, self.cell_boundaries[i], self.cell_boundaries[i+1], n=4)[0]
             for i in range(self.n_cells)])
+
+    def cell_centers(self):
+
+        return np.arange(0.5 * self.h, self.n_cells * self.h, self.h)

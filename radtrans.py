@@ -4,9 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import modelProblem
+import absorption
+import mesh
 import discretization
 import solver
-import absorption
 
 
 class RadiativeTransfer:
@@ -51,9 +52,10 @@ class RadiativeTransfer:
                 'quadratureWeights').split(',')]
 
         self.method = str(config['DISCRETIZATION']['method'])
-        self.flux = str(config['DISCRETIZATION']['flux'])
-        self.n_cells = int(config['DISCRETIZATION']['n_cells'])
-        self.n_ordinates = int(config['DISCRETIZATION']['n_ordinates'])
+
+        n_cells = int(config['DISCRETIZATION']['n_cells'])
+        n_ordinates = int(config['DISCRETIZATION']['n_ordinates'])
+        flux = str(config['DISCRETIZATION']['flux'])
 
         solver_name = str(config['SOLVER']['solver'])
         initial_guess = str(config['SOLVER']['initialGuess'])
@@ -67,45 +69,45 @@ class RadiativeTransfer:
         # define model problem and discretization
         model_problem = modelProblem.ModelProblem(
             dimension, temperature, frequency, albedo, emissivity, scattering,
-            absorption_coeff.abs_fun, domain, boundary_values)
+            absorption_coeff.abs_fun, boundary_values)
+
+        self.mesh = mesh.Mesh(domain, n_cells)
 
         assert(self.method == 'finiteVolume')
 
+        disc = None
+
         if scattering == 'isotropic':
 
-            self.disc = discretization.FiniteVolume1d(
-              generalizedInterface
-                model_problem, self.n_cells, self.n_ordinates,
-                quadrature_weights)
+            disc = discretization.FiniteVolume1d(
+                model_problem, self.mesh, n_ordinates, quadrature_weights,
+                flux)
 
         else:
 
-            self.disc = discretization.FiniteVolume1d(
-                model_problem, self.n_cells, self.n_ordinates)
+            disc = discretization.FiniteVolume1d(
+                model_problem, self.mesh, n_ordinates, quadrature_weights,
+                flux)
 
         # define stiffness matrix, load vector, solver and preconditioner
         if preconditioner == 'LambdaIteration':
-            preconditioner = solver.LambdaPreconditioner(self.disc)
+            preconditioner = solver.LambdaPreconditioner(disc)
 
-        A, b = self.disc.stiff_mat, self.disc.load_vec
-
-        self.dom = np.arange(
-            0.5 * self.disc.mesh.h, self.n_cells * self.disc.mesh.h,
-            self.disc.mesh.h)
+        A, b = disc.stiff_mat, disc.load_vec
 
         if initial_guess == "thermalEmission":
 
-            x_in = np.full(self.disc.n_dof, model_problem.s_e)
+            x_in = np.full(disc.n_dof, model_problem.s_e)
 
         elif initial_guess == "noScattering":
 
             sol1 = model_problem.inflow_bc[0] * \
-                np.exp(-self.dom) + model_problem.s_e * \
-                (1 - np.exp(-self.dom))
+                np.exp(-self.mesh.cell_centers()) + model_problem.s_e * \
+                (1 - np.exp(-self.mesh.cell_centers()))
 
             sol2 = model_problem.inflow_bc[1] * \
-                np.exp(-self.dom[::-1]) + model_problem.s_e * \
-                (1 - np.exp(-self.dom[::-1]))
+                np.exp(-self.mesh.cell_centers()[::-1]) + model_problem.s_e * \
+                (1 - np.exp(-self.mesh.cell_centers()[::-1]))
 
             x_in = np.concatenate((sol1, sol2), axis=0)
 
@@ -123,23 +125,25 @@ class RadiativeTransfer:
 
             if self.method == "finiteVolume":
 
-                plt.step(self.dom, self.x[:self.n_cells])
+                plt.step(self.mesh.cell_centers(), self.x[:self.mesh.n_cells])
 
             else:
 
-                plt.plot(self.dom, self.x[:self.n_cells])
+                plt.plot(self.mesh.cell_centers(), self.x[:self.mesh.n_cells])
 
         elif self.outputType == "meanIntensity":
 
             if self.method == "finiteVolume":
 
-                plt.step(self.dom, np.mean(
-                    (self.x[self.n_cells:], self.x[:self.n_cells]), axis=0))
+                plt.step(self.mesh.cell_centers(), np.mean(
+                    (self.x[self.mesh.n_cells:], self.x[:self.mesh.n_cells]),
+                    axis=0))
 
             else:
 
-                plt.plot(self.dom, np.mean(
-                    (self.x[self.n_cells:], self.x[:self.n_cells]), axis=0))
+                plt.plot(self.mesh.cell_centers(), np.mean(
+                    (self.x[self.mesh.n_cells:], self.x[:self.mesh.n_cells]),
+                    axis=0))
 
         plt.show()
 

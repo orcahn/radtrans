@@ -1,7 +1,6 @@
 import numpy as np
 import scipy.sparse as sps
 
-import mesh
 from mesh import Direction as Dir
 
 
@@ -58,7 +57,7 @@ class FiniteVolume1d:
     and matrix vector operations needed in the solvers.
     """
 
-    def __init__(self, mp, n_cells, n_ordinates, do_weights=0,
+    def __init__(self, mp, mesh, n_ordinates, do_weights=0,
                  numerical_flux='upwind'):
         """
         Parameters
@@ -69,13 +68,15 @@ class FiniteVolume1d:
             Total number of cells used to subdivide the domain
         do_weights : tuple of length 2
             Weights for the quadrature of the discrete ordinates
+        numerical_flux : string
+            Numerical flux function used for the discretization
+            of the transport terms.
         """
 
         assert numerical_flux in ['upwind', 'centered'], \
             'Numerical flux ' + numerical_flux + ' not implemented.'
 
         print('Discretization:\n' +
-              '    - number of cells: ' + str(n_cells) + '\n' +
               '    - number of discrete ordinates: ' + str(n_ordinates) + '\n'
               '    - numerical flux: ' + numerical_flux +
               '\n\n\n')
@@ -118,20 +119,19 @@ class FiniteVolume1d:
         #               MESH GENERATION AND MATRIX ASSEMBLY
         # --------------------------------------------------------------------
 
-        self.n_dof = self.n_ord * n_cells
-
-        self.mesh = mesh.Mesh(mp.dom_len, n_cells)
+        self.n_dof = self.n_ord * mesh.n_cells
 
         # TODO: do not store entire array but compute in place when needed
-        self.alpha = self.mesh.integrate_cellwise(mp.abs_fun)
+        self.alpha = mesh.integrate_cellwise(mp.abs_fun)
 
         # coo-format matrices representing the contributions to the stiffness
-        # matrix. By default when converting to CSR or CSC format, duplicate
-        # (i,j) entries will be summed together
-        ta_mat = self.__assemble_transport__(numerical_flux)
+        # matrix.
+        ta_mat = self.__assemble_transport__(mesh, numerical_flux)
         a_data = self.__assemble_absorption__(mp.xip1)
-        s_data = self.__assemble_scattering__(sig, n_cells, mp.xi)
+        s_data = self.__assemble_scattering__(sig, mesh.n_cells, mp.xi)
 
+        # By default when converting to CSR or CSC format, duplicate
+        # (i,j) entries will be summed together
         ta_mat.data = np.concatenate((ta_mat.data, a_data[0]))
         ta_mat.row = np.concatenate((ta_mat.row, a_data[1]))
         ta_mat.col = np.concatenate((ta_mat.col, a_data[2]))
@@ -163,10 +163,10 @@ class FiniteVolume1d:
 
         # add boundary conditions
         for m in range(n_ordinates):
-            self.load_vec[self.mesh.inflow_boundary(m, self.n_dof)] += \
+            self.load_vec[mesh.inflow_boundary(m, self.n_dof)] += \
                 mp.inflow_bc[m]
 
-    def __assemble_transport__(self, num_flux):
+    def __assemble_transport__(self, mesh, num_flux):
 
         # For the transport part, there is no coupling between
         # the different ordinates. The corresponding matrix thus
@@ -177,17 +177,20 @@ class FiniteVolume1d:
 
         for m in range(self.n_ord):
 
-            n_prod = np.dot(self.mesh.outer_normal[Dir.E], self.ord_dir[m])
+            n_prod = np.dot(mesh.outer_normal[Dir.E], self.ord_dir[m])
 
             def num_flux_index(p): return nfi_fun(n_prod > 0.0, p)
 
-            num_flux_value = n_prod if num_flux == 'upwind' else 0.5 * n_prod
+            if num_flux == 'upwind':
+                num_flux_value = [n_prod]
+            else:
+                [0.5 * n_prod, 0.5 * n_prod]
 
             row = []
             col = []
             data = []
 
-            for p in range(self.mesh.n_cells):
+            for p in range(mesh.n_cells):
 
                 # first, deal with the domain boudaries
                 # then with the interior cells
@@ -195,25 +198,25 @@ class FiniteVolume1d:
 
                     colIndex = num_flux_index(p)
 
-                    col += [*colIndex]
+                    col += colIndex
                     row += len(colIndex) * [p]
-                    data += len(colIndex) * [num_flux_value]
+                    data += num_flux_value
 
-                    if self.mesh.outflow_boundary_cell(p, m):
+                    if mesh.outflow_boundary_cell(p, m):
 
                         col += [p]
                         row += [p]
                         data += [-n_prod]
 
-                elif p == self.mesh.n_cells - 1:
+                elif p == mesh.n_cells - 1:
 
                     colIndex = num_flux_index(p - 1)
 
-                    col += [*colIndex]
+                    col += colIndex
                     row += len(colIndex) * [p]
-                    data += len(colIndex) * [-num_flux_value]
+                    data += [-value for value in num_flux_value]
 
-                    if self.mesh.outflow_boundary_cell(p, m):
+                    if mesh.outflow_boundary_cell(p, m):
 
                         col += [p]
                         row += [p]
@@ -223,17 +226,17 @@ class FiniteVolume1d:
 
                     colIndex0 = num_flux_index(p)
                     colIndex1 = num_flux_index(p - 1)
-                    col += [*colIndex0, *colIndex1]
+                    col += colIndex0 + colIndex1
 
                     row += len(colIndex0) * [p]
                     row += len(colIndex1) * [p]
 
-                    data += len(colIndex0) * [num_flux_value]
-                    data += len(colIndex1) * [-num_flux_value]
+                    data += num_flux_value
+                    data += [-value for value in num_flux_value]
 
             block_diag += [sps.coo_matrix(
                 (data, (row, col)),
-                shape=(self.mesh.n_cells, self.mesh.n_cells))]
+                shape=(mesh.n_cells, mesh.n_cells))]
 
         return sps.block_diag(block_diag)
 

@@ -11,6 +11,16 @@ class Direction(IntEnum):
     S = 3       # south
 
 
+def midpoint(a, b, fun, h):
+
+    return h * fun(0.5 * (a + b))
+
+
+def trapezoidal(a, b, fun, h):
+
+    return 0.5 * h * (fun(a) + fun(b))
+
+
 class Mesh:
 
     def __init__(self, domain_length, n_cells):
@@ -38,7 +48,7 @@ class Mesh:
               '    - number of cells: ' + str(n_cells) +
               '\n\n')
 
-    def integrate_cellwise(self, fun):
+    def integrate_cellwise(self, abs_fun, quad_method):
         """
         Compute the L2 scalar product of a function with the basis functions
         corresponding to each cell.
@@ -55,16 +65,21 @@ class Mesh:
             corresponds to the L2 scalar product of fun with basis function k.
         """
 
-        # In a typical application, cell sizes are so small that midpoint
-        # rule is of acceptable accuracy. Tests showed, that higher order
+        # In a typical application, cell sizes are so small that low order
+        # quadrature is of acceptable accuracy. Tests showed, that higher order
         # methods did not significantly improve accuracy, but imposed a
         # high performance overhead.
-        def midpoint(fun, a, b): return self.h * fun(0.5 * (a + b))
+        quadrature_fun = None
+
+        if quad_method == 'midpoint':
+            def quadrature_fun(a, b): return midpoint(a, b, abs_fun, self.h)
+        else:
+            def quadrature_fun(a, b): return trapezoidal(a, b, abs_fun, self.h)
 
         boundaries = np.linspace(0.0, self.dom_len, num=self.n_cells + 1,
                                  endpoint=True, retstep=False)
 
-        return np.array([midpoint(fun, boundaries[i], boundaries[i + 1])
+        return np.array([quadrature_fun(boundaries[i], boundaries[i + 1])
                          for i in range(self.n_cells)])
 
     def inflow_boundary_cells(self, ordIndex):

@@ -56,7 +56,7 @@ class FiniteVolume1d:
     """
 
     def __init__(self, mp, mesh, n_ordinates, do_weights=0,
-                 numerical_flux='upwind'):
+                 numerical_flux='upwind', quadrature='midpoint'):
         """
         Parameters
         ----------
@@ -67,25 +67,36 @@ class FiniteVolume1d:
         do_weights : tuple of length 2
             Weights for the quadrature of the discrete ordinates
         numerical_flux : string
-            Numerical flux function used for the discretization
-            of the transport terms.
+            Numerical flux function used for the discretization of the
+            transport terms.
+        quadrature : string
+            Quadrature method to be used in computation of matrix entries
         """
+
+        # in one dimension there are only two possible discrete ordinates
+        self.n_ord = n_ordinates if mp.dim == 2 else 2
+
+        self.n_dof = self.n_ord * mesh.n_cells
 
         assert numerical_flux in ['upwind', 'centered'], \
             'Numerical flux ' + numerical_flux + ' not implemented.'
 
+        assert quadrature in ['midpoint', 'trapezoidal'], \
+            'Quadrature method ' + quadrature + ' not implemented.'
+
         print('Discretization:\n' +
               '---------------\n' +
-              '    - number of discrete ordinates: ' + str(n_ordinates) + '\n'
+              '    - number of discrete ordinates: ' + str(n_ordinates) +
+              '\n    - number of degrees of freedom: ' + str(self.n_dof) +
+              '\n    - quadrature method: ' + quadrature + ' rule\n' +
               '    - numerical flux: ' + numerical_flux +
               '\n\n')
 
         # --------------------------------------------------------------------
         #               DISCRETE ORDINATES AND SCATTERING
         # --------------------------------------------------------------------
+
         t0 = timeit.default_timer()
-        # in one dimension there are only two possible discrete ordinates
-        self.n_ord = n_ordinates if mp.dim == 2 else 2
 
         # list of directions of the discrete ordinates
         self.ord_dir = [np.array([1.0]), np.array([-1.0])]
@@ -120,10 +131,8 @@ class FiniteVolume1d:
         #               MESH GENERATION AND MATRIX ASSEMBLY
         # --------------------------------------------------------------------
 
-        self.n_dof = self.n_ord * mesh.n_cells
-
         t0 = timeit.default_timer()
-        alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun),
+        alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun, quadrature),
                               reps=self.n_ord)
         t1 = timeit.default_timer() - t0
         print('alpha: ' + "% 10.3e" % (t1))

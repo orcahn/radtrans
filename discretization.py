@@ -213,16 +213,24 @@ class FiniteVolumeDiffusion1d:
             mp.abs_fun, self.mesh[i], self.mesh[i+1], n=4)[0]
             for i in range(n_cells)])
 
+        # Numerical diffusion coefficient obtained as harmonic average
+        # of the cell centers (interior faces) or the value at the face 
+        # (boundary faces) - cf. Bastian (p. 72)
+        self.diffusion_coefficient = np.array([1. / (mp.xip1 * mp.abs_fun(0. * self.h))] 
+                                                + [2. / (mp.xip1 * mp.abs_fun((k + 0.5) * self.h) + mp.xip1 * mp.abs_fun(((k+1) + 0.5) * self.h)) 
+                                                for k in range(n_cells - 1)] 
+                                                + [1. / (mp.xip1 * mp.abs_fun(n_cells * self.h))])
+
         # diagonals of the transport and absorption part of the
         # complete FV stiffness matrix
         ta_main = None
         ta_off = None
         ta_diag_blocks = []
 
-        ta_main = np.array([ - 1./(3. * self.h) * (1 / (mp.xip1 * mp.abs_fun(k*self.h)) + 1 / (mp.xip1 * mp.abs_fun((k+1)*self.h))) - self.alpha[k]
+        ta_main = np.array([ - 1./(3. * self.h) * (self.diffusion_coefficient[k] + self.diffusion_coefficient[k+1]) - self.alpha[k]
                                 for k in range(n_cells)])
 
-        ta_off = np.array([ 1./(3. * self.h) * 1 / (mp.xip1 * mp.abs_fun(k*self.h)) for k in range(1,n_cells)])
+        ta_off = np.array([ 1./(3. * self.h) * self.diffusion_coefficient[k] for k in range(1,n_cells)])
 
         ta_diag_blocks += [sps.diags([ta_main, ta_off, ta_off],
                                                 [0, 1, -1],

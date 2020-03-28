@@ -22,13 +22,11 @@ class LambdaPreconditioner:
     to use the Lambda iteration as a preconditioner
     """
 
-    def __init__(self, discretization):
-
-        self.disc = discretization
+    def __init__(self, disc):
 
         self.M = spsla.LinearOperator(
-            (self.disc.n_dof, self.disc.n_dof), lambda x: spsla.spsolve(
-                self.disc.lambda_prec, x))
+            (disc.n_dof, disc.n_dof),
+            lambda x: spsla.spsolve(disc.lambda_prec, x))
 
 
 class Solver:

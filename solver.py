@@ -1,6 +1,27 @@
 import timeit
 
+import numpy as np
 import scipy.sparse.linalg as spsla
+
+
+def invert_transport(M, x, n_dof, n_ord):
+
+    nc = n_dof // n_ord
+
+    prec_vec = np.empty(n_dof)
+
+    # invert the nc x nc diagonal blocks
+    for m in range(n_ord):
+        prec_vec[m * nc: (m + 1) * nc] = spsla.spsolve(
+            M[m * nc: (m + 1) * nc, m * nc: (m + 1) * nc],
+            x[m * nc: (m + 1) * nc])
+
+    return prec_vec
+
+
+def invert_diagonal(M, x):
+
+    return np.multiply(np.reciprocal(M.diagonal()), x)
 
 
 class solve_counter(object):
@@ -16,17 +37,27 @@ class solve_counter(object):
         self.niter += 1
 
 
-class LambdaPreconditioner:
+class Preconditioner:
     """
     For radiative transfer problems, it is beneficial
     to use the Lambda iteration as a preconditioner
     """
 
-    def __init__(self, disc):
+    def __init__(self, disc, type):
 
-        self.M = spsla.LinearOperator(
-            (disc.n_dof, disc.n_dof),
-            lambda x: spsla.spsolve(disc.lambda_prec, x))
+        if type == 'lambdaIteration':
+            self.M = spsla.LinearOperator(
+                (disc.n_dof, disc.n_dof),
+                lambda x: invert_transport(disc.lambda_prec, x,
+                                           disc.n_dof, disc.n_ord))
+
+        elif type == 'diagonal':
+            self.M = spsla.LinearOperator(
+                (disc.n_dof, disc.n_dof),
+                lambda x: invert_diagonal(disc.stiff_mat, x))
+
+        else:
+            self.M = None
 
 
 class Solver:
@@ -40,7 +71,7 @@ class Solver:
     def __init__(self, name, preconditioner):
 
         self.name = name
-        self.preconditioner = preconditioner
+        self.prec = preconditioner
 
     def solve(self, A, b, x_in=None):
 
@@ -58,19 +89,11 @@ class Solver:
 
         elif self.name == "GMRES":
 
-            if isinstance(self.preconditioner, LambdaPreconditioner):
-
-                M = self.preconditioner.M
-
-            else:
-
-                M = None
-
             counter = solve_counter()
             start_time = timeit.default_timer()
 
             x, exit_code = spsla.gmres(
-                A=A, b=b, M=M, x0=x_in, callback=counter, tol=1e-8)
+                A=A, b=b, M=self.prec.M, x0=x_in, callback=counter, tol=1e-8)
 
             elapsed_time = timeit.default_timer() - start_time
 
@@ -82,19 +105,11 @@ class Solver:
 
         elif self.name == "BiCGSTAB":
 
-            if isinstance(self.preconditioner, LambdaPreconditioner):
-
-                M = self.preconditioner.M
-
-            else:
-
-                M = None
-
             counter = solve_counter()
             start_time = timeit.default_timer()
 
             x, exit_code = spsla.bicgstab(
-                A=A, b=b, M=M, x0=x_in, callback=counter, tol=1e-8)
+                A=A, b=b, M=self.prec.M, x0=x_in, callback=counter, tol=1e-8)
 
             elapsed_time = timeit.default_timer() - start_time
 

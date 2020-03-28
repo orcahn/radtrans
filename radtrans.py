@@ -67,9 +67,9 @@ class RadiativeTransfer:
         assert initial_guess in ['thermalEmission', 'noScattering'], \
             'Initial guess ' + initial_guess + ' unknown.'
 
-        preconditioner = str(config['SOLVER']['Preconditioner'])
-        assert preconditioner in ['none', 'LambdaIteration'], \
-            'Preconditioner ' + preconditioner + ' currently not supported.'
+        prec_type = str(config['SOLVER']['preconditioner'])
+        assert prec_type in ['none', 'lambdaIteration', 'diagonal'], \
+            'Preconditioner ' + prec_type + ' currently not supported.'
 
         self.outputType = str(config['OUTPUT']['type'])
 
@@ -103,21 +103,19 @@ class RadiativeTransfer:
         print('Matrix and rhs assembly: ' +
               "% 10.3e" % (elapsed_time) + ' s')
 
+        prec = None
         x_in = None
 
         if not solver_name == 'SparseDirect':
 
-            # define stiffness matrix, load vector, solver and preconditioner
-            if preconditioner == 'LambdaIteration':
+            # time precoditioner setup
+            start_time = timeit.default_timer()
 
-                # time precoditioner setup
-                start_time = timeit.default_timer()
+            prec = solver.Preconditioner(disc, prec_type)
 
-                preconditioner = solver.LambdaPreconditioner(disc)
-
-                elapsed_time = timeit.default_timer() - start_time
-                print('Preconditioner setup:    ' +
-                      "% 10.3e" % (elapsed_time) + ' s')
+            elapsed_time = timeit.default_timer() - start_time
+            print('Preconditioner setup:    ' +
+                  "% 10.3e" % (elapsed_time) + ' s')
 
             # time initial guess setup
             start_time = timeit.default_timer()
@@ -149,7 +147,7 @@ class RadiativeTransfer:
 
         A, b = disc.stiff_mat, disc.load_vec
 
-        linear_solver = solver.Solver(solver_name, preconditioner)
+        linear_solver = solver.Solver(solver_name, prec)
 
         self.x, self.iters, self.elapsed_time = linear_solver.solve(A, b, x_in)
 

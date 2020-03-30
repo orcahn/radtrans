@@ -216,10 +216,10 @@ class FiniteVolumeDiffusion1d:
         # Numerical diffusion coefficient obtained as harmonic average
         # of the cell centers (interior faces) or the value at the face 
         # (boundary faces) - cf. Bastian (p. 72)
-        self.diffusion_coefficient = np.array([1. / (mp.xip1 * mp.abs_fun(0. * self.h))] 
+        self.diffusion_coefficient = np.array([1. / (mp.xip1 * mp.abs_fun(0.5 * self.h))] 
                                                 + [2. / (mp.xip1 * mp.abs_fun((k + 0.5) * self.h) + mp.xip1 * mp.abs_fun(((k+1) + 0.5) * self.h)) 
                                                 for k in range(n_cells - 1)] 
-                                                + [1. / (mp.xip1 * mp.abs_fun(n_cells * self.h))])
+                                                + [1. / (mp.xip1 * mp.abs_fun((n_cells-0.5) * self.h))])
 
         # diagonals of the transport and absorption part of the
         # complete FV stiffness matrix

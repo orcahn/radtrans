@@ -162,7 +162,7 @@ class RadiativeTransfer:
                 if self.albedo <= 0.9:
                 
                     plt.step(self.dom, np.mean(
-                        (self.x[self.n_cells:], self.x[:self.n_cells]), axis=0))
+                        (self.x[-self.n_cells:], self.x[:self.n_cells]), axis=0))
 
                 else:
 
@@ -171,7 +171,7 @@ class RadiativeTransfer:
             else:
 
                 plt.plot(self.dom, np.mean(
-                    (self.x[self.n_cells:], self.x[:self.n_cells]), axis=0))
+                    (self.x[-self.n_cells:], self.x[:self.n_cells]), axis=0))
 
         plt.show()
 

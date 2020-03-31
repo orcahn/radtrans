@@ -35,10 +35,6 @@ class FiniteVolume1d:
         Total number of degrees of freedom in the complete system.
     n_ord : integer
         Total number of discrete ordinates.
-    h : float
-        Length of a single cell.
-    mesh : one-dimensional np.ndarray
-        Uniform mesh used for the FV discretization.
     stiff_mat : scipy.sparse.csr.csr_matrix
         Sparse stiffness matrix of the system.
     lambda_prec : scipy.sparse.csr.csr_matrix
@@ -62,13 +58,16 @@ class FiniteVolume1d:
         ----------
         mp : modelProblem.ModelProblem1d
             Radiative Transfer problem to be discretized
-        n_cells : integer
-            Total number of cells used to subdivide the domain
+        mesh : mesh.UniformMesh
+            Uniform mesh used for the FV discretization.
+        n_ordinates : integer
+            Number of discrete ordinates. The directions are chosen equidistant
+            on the unit circle.
         do_weights : tuple of length 2
             Weights for the quadrature of the discrete ordinates
         numerical_flux : string
-            Numerical flux function used for the discretization of the
-            transport terms.
+            Numerical flux function used in the discretization of the
+            transport term.
         quadrature : string
             Quadrature method to be used in computation of matrix entries
         """
@@ -99,7 +98,7 @@ class FiniteVolume1d:
         t0 = timeit.default_timer()
 
         # list of directions of the discrete ordinates
-        self.ord_dir = [np.array([1.0]), np.array([-1.0])]
+        ord_dir = [np.array([1.0]), np.array([-1.0])]
 
         if mp.dim == 1 and n_ordinates != 2:
             print('Warning: In one dimension two discrete ordinates' +
@@ -127,22 +126,26 @@ class FiniteVolume1d:
 
         t1 = timeit.default_timer() - t0
         print('scattering coefficients: ' + "% 10.3e" % (t1))
+
         # --------------------------------------------------------------------
-        #               MESH GENERATION AND MATRIX ASSEMBLY
+        #                           MATRIX ASSEMBLY
         # --------------------------------------------------------------------
 
         t0 = timeit.default_timer()
+
         alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun, quadrature),
                               reps=self.n_ord)
+
         t1 = timeit.default_timer() - t0
         print('alpha: ' + "% 10.3e" % (t1))
 
-        # coo-format matrices representing the contributions to the stiffness
-        # matrix.
+        # timing and assembly of the discretized transport term
         t0 = timeit.default_timer()
-        t_mat = self.__assemble_transport__(mesh, numerical_flux)
+        t_mat = self.__assemble_transport__(mesh, ord_dir, numerical_flux)
         t1 = timeit.default_timer() - t0
         print('transport: ' + "% 10.3e" % (t1))
+
+        # timing and assembly of the discretized absorption term
         t0 = timeit.default_timer()
         a_mat = self.__assemble_absorption__(mesh, alpha_tiled, mp.xip1)
         t1 = timeit.default_timer() - t0
@@ -162,6 +165,8 @@ class FiniteVolume1d:
                 shape=(self.n_dof, self.n_dof)).tocsr()
 
         else:
+
+            # timing and assembly of the discretize scattering terms
             t0 = timeit.default_timer()
             s_mat = self.__assemble_scattering__(
                 mesh, alpha_tiled[:mesh.n_cells], sig, mp.xi)
@@ -194,6 +199,7 @@ class FiniteVolume1d:
         # --------------------------------------------------------------------
         #                       LOAD VECTOR ASSEMBLY
         # --------------------------------------------------------------------
+
         t0 = timeit.default_timer()
         self.load_vec = mp.emiss * mp.s_e * alpha_tiled
 
@@ -205,7 +211,7 @@ class FiniteVolume1d:
         t1 = timeit.default_timer() - t0
         print('load vector: ' + "% 10.3e" % (t1) + '\n')
 
-    def __assemble_transport__(self, mesh, num_flux):
+    def __assemble_transport__(self, mesh, ord_dir, num_flux):
 
         # For the transport part, there is no coupling between
         # the different ordinates. The corresponding matrix thus
@@ -218,7 +224,7 @@ class FiniteVolume1d:
         for m in range(self.n_ord):
 
             # scalar product of ordinate direction m with Direction E
-            n_prod = np.dot(mesh.outer_normal[Dir.E], self.ord_dir[m])
+            n_prod = np.dot(mesh.outer_normal[Dir.E], ord_dir[m])
 
             def num_flux_index(p): return nfi_fun(n_prod > 0.0, p)
 
@@ -264,7 +270,6 @@ class FiniteVolume1d:
                             row += [p]
                             data += [n_prod]
 
-            # Loop over interior cells
             for p in mesh.interior_cells():
 
                 colIndex0 = num_flux_index(p)

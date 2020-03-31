@@ -23,12 +23,37 @@ def trapezoidal(a, b, fun, h):
 
 class UniformMesh:
     """
-
+    Uniform mesh in 1 dimension
 
     Attributes
     ----------
+    dom_len : float
+        Length of the one-dimensional domain. The domain itself is then
+        defined as D = (0, dom_len).
+    n_cells : integer
+        Total number of cells the domain is partitioned into
     h : float
         Length of a single cell.
+    outer_normal : {mesh.Direction: np.ndarray} dict
+        Outer normals to corresponding directions
+
+    Methods
+    -------
+    integrate_cellwise(abs_fun, quad_method)
+        Compute the L2 scalar product of a function with the basis functions
+        corresponding to each cell.
+    inflow_boundary_cells(ord_index)
+        Compute the cells with part on the inflow boundary of specific ordinate
+    is_outflow_boundary_cell(cell, ord_index)
+        Test for a cell to have part on the outflow boundary of specific
+        ordinate
+    boundary_cells(direction)
+        Compute the cells with part on the domain boundary in specific
+        direction
+    interior_cells()
+        Compute indices of the interior cells
+    cell_centers()
+        Compute the coordinates of the cell centers
     """
 
     def __init__(self, domain_length, n_cells):
@@ -36,10 +61,9 @@ class UniformMesh:
         Parameters
         ----------
         domain_length : float
-            Length of the one-dimensional domain. The domain itself is then
-            defined as D = (0, dom_len).
+            Length of the one-dimensional domain
         n_cells : integer
-            Number of cells, the domain is to be partitioned into.
+            Number of cells
         """
 
         self.dom_len = domain_length
@@ -64,7 +88,10 @@ class UniformMesh:
         Parameters
         ----------
         fun : callable
-            the function to be used as argument in the scalar product
+            The function to be used as argument in the scalar product
+        quad_method : string
+            Specifies which quadrature method to use in the computation of
+            the scalar product.
 
         Returns
         -------
@@ -90,13 +117,28 @@ class UniformMesh:
         return np.array([quadrature_fun(boundaries[i], boundaries[i + 1])
                          for i in range(self.n_cells)])
 
-    def inflow_boundary_cells(self, ordIndex):
+    def inflow_boundary_cells(self, ord_index):
+        """
+        List of all cell indices corresponding to a cell, which has at
+        least one face on the inflow boundary of ordinate ord_index.
 
-        if ordIndex == 0:
+        Parameters
+        ----------
+        ord_index : integer
+            Index of the desired ordinate
+
+        Returns
+        -------
+        list of integers
+            List of the indices of the cells with part in the
+            inflow boundary of ord_index
+        """
+
+        if ord_index == 0:
 
             return [0]
 
-        elif ordIndex == 1:
+        elif ord_index == 1:
 
             return [-1]
 
@@ -104,6 +146,22 @@ class UniformMesh:
             raise Exception('Invalid ordinate index')
 
     def is_outflow_boundary_cell(self, cell, ord_index):
+        """
+        Test for a cell to be part of the outflow boundary
+
+        Parameters
+        ----------
+        cell : integer
+            Index of the cell to be tested
+        ord_index : integer
+            Index of the desired ordinate
+
+        Returns
+        -------
+        bool
+            True if cell has a part on the outflow boundary of ordinate
+            ord_index, False otherwise.
+        """
 
         if ord_index == 0:
 
@@ -122,6 +180,20 @@ class UniformMesh:
                 return False
 
     def boundary_cells(self, direction):
+        """
+        Cells with part on the domain boudary in a certain direction
+
+        Parameters
+        ----------
+        direction : mesh.Direction
+            Direction, indicating the boudary
+
+        Returns
+        -------
+        range
+            Range of indices of the cells with part on the boundary
+            specified by the direction.
+        """
 
         if direction == Direction.E:
             return range(self.n_cells - 1, self.n_cells)
@@ -133,9 +205,26 @@ class UniformMesh:
             return range(0)
 
     def interior_cells(self):
+        """
+        Indices of the interior cells
+
+        Returns
+        -------
+        range
+            Range of indices of the interior cells of the domain.
+        """
 
         return range(1, self.n_cells - 1)
 
     def cell_centers(self):
+        """
+        Coordinates of the cell centers
+
+        Returns
+        -------
+        np.ndarray
+            Array containing the coordinates of the cell centers with the same
+            indexing as for the corresponding cell indices.
+        """
 
         return np.arange(0.5 * self.h, self.n_cells * self.h, self.h)

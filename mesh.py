@@ -21,7 +21,15 @@ def trapezoidal(a, b, fun, h):
     return 0.5 * h * (fun(a) + fun(b))
 
 
-class Mesh:
+class UniformMesh:
+    """
+
+
+    Attributes
+    ----------
+    h : float
+        Length of a single cell.
+    """
 
     def __init__(self, domain_length, n_cells):
         """

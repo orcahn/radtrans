@@ -78,7 +78,7 @@ class RadiativeTransfer:
             dimension, temperature, frequency, albedo, emissivity, scattering,
             absorption_coeff.abs_fun, boundary_values)
 
-        self.mesh = mesh.Mesh(domain, n_cells)
+        self.mesh = mesh.UniformMesh(domain, n_cells)
 
         assert(self.method == 'finiteVolume')
 

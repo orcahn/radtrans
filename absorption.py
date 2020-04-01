@@ -32,6 +32,8 @@ def step_abs(x, L):
     return np.heaviside(x - L / 2.0, 1.0)
 
 
+# piecewise constant absorption with random values
+# following a gaussian distribution
 def gaussian_random_piecewise(x, constants):
 
     bool_array1 = [x >= 0.5 * i for i in range(len(constants))]
@@ -42,16 +44,29 @@ def gaussian_random_piecewise(x, constants):
 
 class Absorption:
     """
-    Class that represents some types of constant and
-    spatially varying absorption coefficients
+    Wrapper for the spatially varying absorption coefficient in the radiative
+    transfer problem.
+
+    Attributes
+    ----------
+    abs_fun : callable
+        Callable object, representing the absorption coefficient. Takes
+        values in the domain as argument.
     """
 
     def __init__(self, abs_fun_type, domain_length):
+        """
+        Paramters
+        ---------
+        abs_fun_type : string
+            Type of absorption coefficient as parsed from the .ini file
+        domain_length : float
+            Right boundary L of the domain (0, L)
+        """
 
         assert abs_fun_type in ['none', 'const', 'posGrad', 'gaussian',
                                 'step', 'gaussianRandomPiecewise'], \
-                                'Absorption type ' + abs_fun_type + \
-                                ' currently not supported.'
+            'Absorption type ' + abs_fun_type + ' currently not supported.'
 
         self.abs_fun = None
 

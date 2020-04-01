@@ -32,13 +32,16 @@ class RadiativeTransfer:
         frequency = float(config['MODEL']['frequency'])
         albedo = float(config['MODEL']['albedo'])
         emissivity = float(config['MODEL']['emissivity'])
-        domain = float(config['MODEL']['domain'])
-        abs_type = config['MODEL']['absorptionType']
+
+        domain = tuple(
+            map(float,
+                config['MODEL']['domain'].strip().split(',')))
 
         scattering = str(config['MODEL']['scattering'])
         assert scattering in ['none', 'isotropic'], \
             'Scattering type ' + scattering + ' currently not supported.'
 
+        abs_type = config['MODEL']['absorptionType']
         absorption_coeff = absorption.Absorption(abs_type, domain)
 
         boundary_values = [
@@ -55,7 +58,9 @@ class RadiativeTransfer:
 
         self.method = str(config['DISCRETIZATION']['method'])
 
-        n_cells = int(config['DISCRETIZATION']['n_cells'])
+        n_cells = tuple(
+            map(int,
+                config['DISCRETIZATION']['n_cells'].strip().split(',')))
         n_ordinates = int(config['DISCRETIZATION']['n_ordinates'])
         flux = str(config['DISCRETIZATION']['flux'])
 
@@ -75,10 +80,10 @@ class RadiativeTransfer:
 
         # define model problem and discretization
         model_problem = modelProblem.ModelProblem(
-            dimension, temperature, frequency, albedo, emissivity, scattering,
+            temperature, frequency, albedo, emissivity, scattering,
             absorption_coeff.abs_fun, boundary_values)
 
-        self.mesh = mesh.UniformMesh(domain, n_cells)
+        self.mesh = mesh.UniformMesh(dimension, domain, n_cells)
 
         assert(self.method == 'finiteVolume')
 

@@ -23,15 +23,18 @@ def trapezoidal(a, b, fun, h):
 
 class UniformMesh:
     """
-    Uniform mesh in 1 dimension
+    Uniform mesh in 1 or 2 dimensions
 
     Attributes
     ----------
-    dom_len : float
-        Length of the one-dimensional domain. The domain itself is then
-        defined as D = (0, dom_len).
-    n_cells : integer
-        Total number of cells the domain is partitioned into
+    dim : integer
+        The dimension of the domain.
+    dom_len : tuple of floats
+        Length of the domain.
+    n_cells : tuple of integers
+        tuple indicating the number of cells along each dimension.
+    n_tot : integer
+        Total number of cells the domain is partitioned into.
     h : float
         Length of a single cell.
     outer_normal : {mesh.Direction: np.ndarray} dict
@@ -56,19 +59,41 @@ class UniformMesh:
         Compute the coordinates of the cell centers
     """
 
-    def __init__(self, domain_length, n_cells):
+    def __init__(self, dimension, domain_length, n_cells):
         """
         Parameters
         ----------
+        dimension : integer
+            The dimension of the domain
         domain_length : float
             Length of the one-dimensional domain
         n_cells : integer
             Number of cells
         """
 
-        self.dom_len = domain_length
-        self.n_cells = n_cells
-        self.h = domain_length / float(n_cells)
+        assert dimension in [1, 2], \
+            'Dimension ' + dimension + ' of the domain is not supported. ' + \
+            'Currently only 1 and 2 dimensions are supported.'
+        self.dim = dimension
+
+        for length in domain_length:
+            assert length > 0.0, 'Invalid domain length. Must be positive'
+        self.dom_len = domain_length[:dimension]
+
+        domain_str = '(0.0, ' + str(domain_length[0]) + ')'
+        for d in range(dimension - 1):
+            domain_str += ' x (0.0, ' + str(domain_length[d + 1]) + ')'
+
+        self.n_cells = n_cells[:dimension]
+
+        # compute total number of cells
+        self.n_tot = 1
+
+        for nc in self.n_cells:
+            self.n_tot *= nc
+
+        self.h = tuple(
+            map(lambda a, b: a / float(b), self.dom_len, self.n_cells))
 
         # Outer normal vectors
         self.outer_normal = {Direction.E: np.array([1.0]),
@@ -76,8 +101,11 @@ class UniformMesh:
 
         print('Mesh:\n' +
               '-----\n' +
-              '    - domain: (0.0, ' + str(domain_length) + ')\n' +
-              '    - number of cells: ' + str(n_cells) +
+              '    - dimension: ' + str(dimension) + '\n' +
+              '    - domain: ' + domain_str + '\n' +
+              '    - cells per dimension: ' + str(self.n_cells) + '\n' +
+              '    - total number of cells: ' + str(self.n_tot) + '\n' +
+              '    - mesh size per dimension: ' + str(self.h) +
               '\n\n')
 
     def integrate_cellwise(self, abs_fun, quad_method):
@@ -95,7 +123,7 @@ class UniformMesh:
 
         Returns
         -------
-        np.ndarray of shape (n_cells,)
+        np.ndarray of shape (n_tot,)
             Array with same number of entries as there are cells. Each entry k
             corresponds to the L2 scalar product of fun with basis function k.
         """

@@ -73,9 +73,9 @@ class FiniteVolume1d:
         """
 
         # in one dimension there are only two possible discrete ordinates
-        self.n_ord = n_ordinates if mp.dim == 2 else 2
+        self.n_ord = n_ordinates if mesh.dim == 2 else 2
 
-        self.n_dof = self.n_ord * mesh.n_cells
+        self.n_dof = self.n_ord * mesh.n_tot
 
         assert numerical_flux in ['upwind', 'centered'], \
             'Numerical flux ' + numerical_flux + ' not implemented.'
@@ -100,7 +100,7 @@ class FiniteVolume1d:
         # list of directions of the discrete ordinates
         ord_dir = [np.array([1.0]), np.array([-1.0])]
 
-        if mp.dim == 1 and n_ordinates != 2:
+        if mesh.dim == 1 and n_ordinates != 2:
             print('Warning: In one dimension two discrete ordinates' +
                   '(+1.0, -1.0) will be used!')
 
@@ -118,7 +118,7 @@ class FiniteVolume1d:
                 'discrete ordinates do not match.'
 
             # scattering probability for all discrete ordinates
-            scat_prob = 1.0 / ((2.0 * np.pi)**(mp.dim - 1) * 2.0)
+            scat_prob = 1.0 / ((2.0 * np.pi)**(mesh.dim - 1) * 2.0)
 
             for i in range(self.n_ord):
                 for j in range(self.n_ord):

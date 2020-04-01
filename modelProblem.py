@@ -15,8 +15,6 @@ class ModelProblem:
 
     Attributes
     ----------
-    dim : integer
-        The dimension of the domain.
     alb : float
         Albedo of the medium.
     emiss : float
@@ -41,13 +39,11 @@ class ModelProblem:
         radiation and temperature of medium.
     """
 
-    def __init__(self, dimension, temperature, frequency, albedo, emissivity,
+    def __init__(self, temperature, frequency, albedo, emissivity,
                  scattering, absorption_fun, inflow_bc):
         """
         Parameters
         ----------
-        dimension : integer
-            The dimension of the domain
         temperature : float
             Temperature of the medium, measured in Kelvin. It is assumed
             to be constant on the timescale of interest.
@@ -67,12 +63,6 @@ class ModelProblem:
             discrete ordinates. In one dimension there are exactly two
             ordinates.
         """
-
-        assert dimension in [1, 2], \
-            'Dimension ' + dimension + ' of the domain is not supported. ' + \
-            'Currently only 1 and 2 dimensions are supported.'
-        self.dim = dimension
-
         self.s_e = 0
 
         e_ratio = (natConstSI.h_pla * frequency) / \
@@ -107,10 +97,9 @@ class ModelProblem:
 
         print('\n\nModel problem:\n' +
               '--------------\n' +
-              '    - dimension: 1\n' +
               '    - temperature: ' + str(temperature) + ' K\n' +
               '    - frequency: ' + str(frequency/1e12) + ' THz\n' +
               '    - s_e: ' + str(self.s_e) + '\n' +
               '    - albedo: ' + str(albedo) + '\n' +
               '    - emissivity: ' + str(emissivity) + '\n' +
-              '    - isotropic scattering\n\n')
+              '    - scattering: ' + scattering + '\n\n')

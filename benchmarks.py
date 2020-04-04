@@ -34,6 +34,7 @@ for precond in ['none', 'LambdaIteration']:
                                 'Preconditioner': precond,
                                 'initialGuess': 'thermalEmission'}
 
+            config['OUTPUT'] = {'type': 'firstOrdinate'}
             with open('benchmarks.ini', 'w') as configfile:
                 config.write(configfile)
             radtrans.main(['file: ', 'benchmarks.ini'])
@@ -73,6 +74,8 @@ for precond in ['LambdaIteration']:
             config['Solver'] = {'Name': solver,
                                 'Preconditioner': precond,
                                 'InitialGuess': 'Inflow'}
+
+            config['OUTPUT'] = {'type': 'firstOrdinate'}
 
             with open('benchmarks.ini', 'w') as configfile:
                 config.write(configfile)

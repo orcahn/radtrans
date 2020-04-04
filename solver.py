@@ -1,5 +1,27 @@
-import time
+import timeit
+
+import numpy as np
 import scipy.sparse.linalg as spsla
+
+
+def invert_transport(M, x, n_dof, n_ord):
+
+    nc = n_dof // n_ord
+
+    prec_vec = np.empty(n_dof)
+
+    # invert the nc x nc diagonal blocks
+    for m in range(n_ord):
+        prec_vec[m * nc: (m + 1) * nc] = spsla.spsolve(
+            M[m * nc: (m + 1) * nc, m * nc: (m + 1) * nc],
+            x[m * nc: (m + 1) * nc])
+
+    return prec_vec
+
+
+def invert_diagonal(M, x):
+
+    return np.multiply(np.reciprocal(M.diagonal()), x)
 
 
 class solve_counter(object):
@@ -15,19 +37,27 @@ class solve_counter(object):
         self.niter += 1
 
 
-class LambdaPreconditioner:
+class Preconditioner:
     """
     For radiative transfer problems, it is beneficial
     to use the Lambda iteration as a preconditioner
     """
 
-    def __init__(self, discretization):
+    def __init__(self, disc, type):
 
-        self.disc = discretization
+        if type == 'lambdaIteration':
+            self.M = spsla.LinearOperator(
+                (disc.n_dof, disc.n_dof),
+                lambda x: invert_transport(disc.lambda_prec, x,
+                                           disc.n_dof, disc.n_ord))
 
-        self.M = spsla.LinearOperator(
-            (self.disc.n_dof, self.disc.n_dof), lambda x: spsla.spsolve(
-                self.disc.lambda_prec, x))
+        elif type == 'diagonal':
+            self.M = spsla.LinearOperator(
+                (disc.n_dof, disc.n_dof),
+                lambda x: invert_diagonal(disc.stiff_mat, x))
+
+        else:
+            self.M = None
 
 
 class Solver:
@@ -41,64 +71,50 @@ class Solver:
     def __init__(self, name, preconditioner):
 
         self.name = name
-        self.preconditioner = preconditioner
+        self.prec = preconditioner
 
     def solve(self, A, b, x_in=None):
 
         if self.name == "SparseDirect":
 
-            t = time.process_time()
+            start_time = timeit.default_timer()
 
             x = spsla.spsolve(A, b)
-            elapsed_time = time.process_time() - t
+            elapsed_time = timeit.default_timer() - start_time
 
-            print("Sparse direct solver ended after " + str(elapsed_time) +
-                  "s")
+            print('Sparse direct solver:    ' +
+                  "% 10.3e" % (elapsed_time) + ' s')
 
             return x, None, elapsed_time
 
         elif self.name == "GMRES":
 
-            if isinstance(self.preconditioner, LambdaPreconditioner):
-
-                M = self.preconditioner.M
-
-            else:
-
-                M = None
-
             counter = solve_counter()
-            t = time.process_time()
+            start_time = timeit.default_timer()
 
             x, exit_code = spsla.gmres(
-                A=A, b=b, M=M, x0=x_in, callback=counter, tol=1e-8)
+                A=A, b=b, M=self.prec.M, x0=x_in, callback=counter, tol=1e-8)
 
-            elapsed_time = time.process_time() - t
+            elapsed_time = timeit.default_timer() - start_time
 
-            print("GMRES ended with exit code " + str(exit_code)+" after " +
-                  str(counter.niter)+" iterations in "+str(elapsed_time)+"s")
+            print('GMRES ended with exit code ' + str(exit_code) + ' after ' +
+                  str(counter.niter) + ' iterations in ' +
+                  "% 10.3e" % (elapsed_time) + ' s')
 
             return x, counter.niter, elapsed_time
 
         elif self.name == "BiCGSTAB":
 
-            if isinstance(self.preconditioner, LambdaPreconditioner):
-
-                M = self.preconditioner.M
-
-            else:
-
-                M = None
-
             counter = solve_counter()
-            t = time.process_time()
+            start_time = timeit.default_timer()
 
             x, exit_code = spsla.bicgstab(
-                A=A, b=b, M=M, x0=x_in, callback=counter, tol=1e-8)
+                A=A, b=b, M=self.prec.M, x0=x_in, callback=counter, tol=1e-8)
 
-            elapsed_time = time.process_time() - t
+            elapsed_time = timeit.default_timer() - start_time
 
-            print("BiCGSTAB ended with exit code " + str(exit_code)+" after " +
-                  str(counter.niter)+" iterations in "+str(elapsed_time)+"s")
+            print('BiCGSTAB ended with exit code ' + str(exit_code) +
+                  ' after ' + str(counter.niter) + ' iterations in ' +
+                  "% 10.3e" % (elapsed_time) + ' s')
 
             return x, counter.niter, elapsed_time

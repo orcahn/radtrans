@@ -231,7 +231,7 @@ class FiniteVolume1d:
             if num_flux == 'upwind':
                 num_flux_value = [n_prod]
             else:
-                [0.5 * n_prod, 0.5 * n_prod]
+                num_flux_value = [0.5 * n_prod, 0.5 * n_prod]
 
             row = []
             col = []

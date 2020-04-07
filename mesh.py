@@ -96,8 +96,16 @@ class UniformMesh:
             map(lambda a, b: a / float(b), self.dom_len, self.n_cells))
 
         # Outer normal vectors
-        self.outer_normal = {Direction.E: np.array([1.0]),
-                             Direction.W: np.array([-1.0])}
+        self.outer_normal = None
+
+        if dimension == 1:
+            self.outer_normal = {Direction.E: np.array([1.0]),
+                                 Direction.W: np.array([-1.0])}
+        elif dimension == 2:
+            self.outer_normal = {Direction.E: np.array([1.0, 0.0]),
+                                 Direction.N: np.array([0.0, 1.0]),
+                                 Direction.W: np.array([-1.0, 0.0]),
+                                 Direction.S: np.array([0.0, -1.0])}
 
         print('Mesh:\n' +
               '-----\n' +

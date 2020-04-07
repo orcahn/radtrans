@@ -83,7 +83,11 @@ class RadiativeTransfer:
             temperature, frequency, albedo, emissivity, scattering,
             absorption_coeff.abs_fun, boundary_values)
 
+        # time mesh generation
+        start_time = timeit.default_timer()
         self.mesh = mesh.UniformMesh(dimension, domain, n_cells)
+        elapsed_time = timeit.default_timer() - start_time
+        mesh_time = elapsed_time
 
         assert(self.method == 'finiteVolume')
 
@@ -103,8 +107,11 @@ class RadiativeTransfer:
                 flux)
 
         elapsed_time = timeit.default_timer() - start_time
+
         print('Timings:')
         print('--------')
+        print('Mesh generation: ' +
+              "% 10.3e" % (mesh_time) + ' s')
         print('Matrix and rhs assembly: ' +
               "% 10.3e" % (elapsed_time) + ' s')
 
@@ -162,24 +169,28 @@ class RadiativeTransfer:
 
             if self.method == "finiteVolume":
 
-                plt.step(self.mesh.cell_centers(), self.x[:self.mesh.n_cells])
+                plt.step(self.mesh.cell_centers(),
+                         self.x[:self.mesh.n_cells[0]])
 
             else:
 
-                plt.plot(self.mesh.cell_centers(), self.x[:self.mesh.n_cells])
+                plt.plot(self.mesh.cell_centers(),
+                         self.x[:self.mesh.n_cells[0]])
 
         elif self.outputType == "meanIntensity":
 
             if self.method == "finiteVolume":
 
                 plt.step(self.mesh.cell_centers(), np.mean(
-                    (self.x[self.mesh.n_cells:], self.x[:self.mesh.n_cells]),
+                    (self.x[self.mesh.n_cells[0]:],
+                     self.x[:self.mesh.n_cells[0]]),
                     axis=0))
 
             else:
 
                 plt.plot(self.mesh.cell_centers(), np.mean(
-                    (self.x[self.mesh.n_cells:], self.x[:self.mesh.n_cells]),
+                    (self.x[self.mesh.n_cells[0]:],
+                     self.x[:self.mesh.n_cells[0]]),
                     axis=0))
 
         plt.show()

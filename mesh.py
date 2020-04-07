@@ -35,10 +35,12 @@ class UniformMesh:
         tuple indicating the number of cells along each dimension.
     n_tot : integer
         Total number of cells the domain is partitioned into.
-    h : float
-        Length of a single cell.
+    h : tuple of floats
+        Length of a single cell along each dimension
     outer_normal : {mesh.Direction: np.ndarray} dict
         Outer normals to corresponding directions
+    grid : tuple of np.ndarray
+        Cartesian Coordinates of the gridpoints.
 
     Methods
     -------
@@ -107,6 +109,14 @@ class UniformMesh:
                                  Direction.W: np.array([-1.0, 0.0]),
                                  Direction.S: np.array([0.0, -1.0])}
 
+        # i-th x-coordinate is given by entry [i, 0] in first tuple entry.
+        # j-th y-coordinate is given by entry [0, j] in second tuple entry.
+        self.grid = np.meshgrid(
+            *[np.linspace(0.0, self.dom_len[n],
+                          num=self.n_cells[n] + 1, endpoint=True)
+              for n in range(dimension)],
+            indexing='ij', sparse=True, copy=False)
+
         print('Mesh:\n' +
               '-----\n' +
               '    - dimension: ' + str(dimension) + '\n' +
@@ -143,15 +153,16 @@ class UniformMesh:
         quadrature_fun = None
 
         if quad_method == 'midpoint':
-            def quadrature_fun(a, b): return midpoint(a, b, abs_fun, self.h)
+            def quadrature_fun(a, b): return midpoint(a, b, abs_fun, self.h[0])
         else:
-            def quadrature_fun(a, b): return trapezoidal(a, b, abs_fun, self.h)
+            def quadrature_fun(a, b): return trapezoidal(
+                a, b, abs_fun, self.h[0])
 
-        boundaries = np.linspace(0.0, self.dom_len, num=self.n_cells + 1,
+        boundaries = np.linspace(0.0, self.dom_len, num=self.n_cells[0] + 1,
                                  endpoint=True, retstep=False)
 
         return np.array([quadrature_fun(boundaries[i], boundaries[i + 1])
-                         for i in range(self.n_cells)])
+                         for i in range(self.n_cells[0])])
 
     def inflow_boundary_cells(self, ord_index):
         """
@@ -201,7 +212,7 @@ class UniformMesh:
 
         if ord_index == 0:
 
-            if cell == self.n_cells - 1:
+            if cell == self.n_cells[0] - 1:
                 return True
 
             else:
@@ -232,7 +243,7 @@ class UniformMesh:
         """
 
         if direction == Direction.E:
-            return range(self.n_cells - 1, self.n_cells)
+            return range(self.n_cells[0] - 1, self.n_cells[0])
 
         elif direction == Direction.W:
             return range(1)
@@ -250,7 +261,7 @@ class UniformMesh:
             Range of indices of the interior cells of the domain.
         """
 
-        return range(1, self.n_cells - 1)
+        return range(1, self.n_cells[0] - 1)
 
     def cell_centers(self):
         """
@@ -263,4 +274,5 @@ class UniformMesh:
             indexing as for the corresponding cell indices.
         """
 
-        return np.arange(0.5 * self.h, self.n_cells * self.h, self.h)
+        return np.arange(
+            0.5 * self.h[0], self.n_cells[0] * self.h[0], self.h[0])

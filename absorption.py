@@ -29,7 +29,7 @@ def gaussian_abs(x, L):
 # discontinuous absorption coefficient
 def step_abs(x, L):
 
-    return np.heaviside(x - L / 2.0, 1.0)
+    return np.heaviside(x - L[0] / 2.0, 1.0)
 
 
 # piecewise constant absorption with random values

@@ -132,9 +132,9 @@ class FiniteVolume1d:
         # --------------------------------------------------------------------
 
         t0 = timeit.default_timer()
-
+        print(mesh.integrate_cellwise(mp.abs_fun, quadrature).shape)
         alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun, quadrature),
-                              reps=self.n_ord)
+                              reps=(self.n_ord, 1))
 
         t1 = timeit.default_timer() - t0
         print('alpha: ' + "% 10.3e" % (t1))
@@ -169,7 +169,7 @@ class FiniteVolume1d:
             # timing and assembly of the discretize scattering terms
             t0 = timeit.default_timer()
             s_mat = self.__assemble_scattering__(
-                mesh, alpha_tiled[:mesh.n_cells], sig, mp.xi)
+                mesh, alpha_tiled[:mesh.n_cells[0]], sig, mp.xi)
             t1 = timeit.default_timer() - t0
             print('scattering: ' + "% 10.3e" % (t1))
 
@@ -256,7 +256,7 @@ class FiniteVolume1d:
                             row += [p]
                             data += [-n_prod]
 
-                    if p == mesh.n_cells - 1:
+                    if p == mesh.n_cells[0] - 1:
 
                         colIndex = num_flux_index(p - 1)
 
@@ -282,8 +282,9 @@ class FiniteVolume1d:
                 data += num_flux_value
                 data += [-value for value in num_flux_value]
 
-            block_diag += [sps.coo_matrix((data, (row, col)),
-                                          shape=(mesh.n_cells, mesh.n_cells))]
+            block_diag += [sps.coo_matrix(
+                (data, (row, col)),
+                shape=(mesh.n_cells[0], mesh.n_cells[0]))]
 
         return sps.block_diag(block_diag)
 
@@ -292,7 +293,8 @@ class FiniteVolume1d:
         # for the pure absorption part, there is neither a coupling between
         # neighbouring cells nor between different ordinates, the the resulting
         # matrix is diagonal.
-        return sps.diags(alpha_tiled, format='coo',
+        print(alpha_tiled.shape)
+        return sps.diags(np.ravel(alpha_tiled), format='coo',
                          shape=(self.n_dof, self.n_dof))
 
     def __assemble_scattering__(self, mesh, alpha, sig, xi):
@@ -308,7 +310,8 @@ class FiniteVolume1d:
             block_row = []
 
             for n in range(self.n_ord):
-                block_row += [sps.diags(-xi * sig[m, n] * alpha, format='coo')]
+                block_row += [sps.diags(-xi * sig[m, n]
+                                        * np.ravel(alpha), format='coo')]
 
             blocks += [block_row]
 

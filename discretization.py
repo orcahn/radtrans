@@ -6,22 +6,43 @@ import scipy.sparse as sps
 from mesh import Direction as Dir
 
 
-def upwind_index(sameDirection, cell):
+def upwind_flux_minus(scalar_prod, h):
 
-    # orthogonal direction does not matter because
-    # corresponding entry is zero
-    if sameDirection:
-
-        return [cell]
-
+    if scalar_prod > 0.0:
+        return -h * scalar_prod
     else:
+        return 0.0
 
-        return [cell + 1]
+
+def upwind_flux_null(scalar_prod, h):
+
+    if scalar_prod > 0.0:
+        return h * scalar_prod
+    else:
+        return -h * scalar_prod
 
 
-def centered_index(sameDirection, cell):
+def upwind_flux_plus(scalar_prod, h):
 
-    return [cell, cell + 1]
+    if scalar_prod > 0.0:
+        return 0.0
+    else:
+        return h * scalar_prod
+
+
+def centered_flux_minus(scalar_prod, h):
+
+    return -0.5 * h * scalar_prod
+
+
+def centered_flux_null(scalar_prod, h):
+
+    return 0.0
+
+
+def centered_flux_plus(scalar_prod, h):
+
+    return 0.5 * h * scalar_prod
 
 
 class FiniteVolume1d:
@@ -218,73 +239,152 @@ class FiniteVolume1d:
         # has block diagonal structure.
         block_diag = []
 
-        # numerical flux index function
-        nfi_fun = upwind_index if num_flux == 'upwind' else centered_index
+        flux_minus = None
+        flux_null = None
+        flux_plus = None
+
+        if num_flux == 'upwind':
+
+            flux_minus = upwind_flux_minus
+            flux_null = upwind_flux_null
+            flux_plus = upwind_flux_plus
+
+        else:
+
+            flux_minus = centered_flux_minus
+            flux_null = centered_flux_null
+            flux_plus = centered_flux_plus
 
         for m in range(self.n_ord):
 
-            # scalar product of ordinate direction m with Direction E
-            n_prod = np.dot(mesh.outer_normal[Dir.E], ord_dir[m])
+            outflow_boundary = mesh.outflow_boundary()
 
-            def num_flux_index(p): return nfi_fun(n_prod > 0.0, p)
+            h_h = mesh.h[0]
+            h_v = mesh.h[1]
+            n_0 = mesh.n_cells[0]
 
-            if num_flux == 'upwind':
-                num_flux_value = [n_prod]
-            else:
-                [0.5 * n_prod, 0.5 * n_prod]
+            # scalar product of eastern outer normal with ordinate direction m
+            n_prod_E = np.dot(mesh.outer_normal[Dir.E], ord_dir[m])
+            n_prod_N = np.dot(mesh.outer_normal[Dir.N], ord_dir[m])
+            n_prod_W = -n_prod_E
+            n_prod_S = -n_prod_N
 
             row = []
             col = []
             data = []
 
-            # Loop over boundary cells
-            for boundary in mesh.outer_normal:
+            for i in mesh.interior_cells():
 
-                for p in mesh.boundary_cells(boundary):
+                # within one ordinate, for the transport part there is only
+                # coupling between one cell and its direct neighbours in the
+                # four directions. This translates to 5 nonzero entries.
+                row += 5 * [i]
+                col += [i, i-1, i+1, i-n_0, i+n_0]
+                data += [flux_null(n_prod_E, h_v) +
+                         flux_null(n_prod_N, mesh.h[0]),
+                         flux_minus(n_prod_E, h_v),
+                         flux_plus(n_prod_E, h_v),
+                         flux_minus(n_prod_N, h_h),
+                         flux_plus(n_prod_N, h_h)]
 
-                    if p == 0:
+            # the boundary cells exclude cells in the corners. These are
+            # treated separately below
+            for i in mesh.outflow_boundary_cells(Dir.E):
 
-                        colIndex = num_flux_index(p)
+                row += 4 * [i]
+                col += [i, i-1, i-n_0, i+n_0]
+                data += [h_v * n_prod_E -
+                         flux_plus(n_prod_E, h_v) +
+                         flux_null(n_prod_N, h_h),
+                         flux_minus(n_prod_E, h_v),
+                         flux_minus(n_prod_N, h_h),
+                         flux_plus(n_prod_N, h_h)]
 
-                        col += colIndex
-                        row += len(colIndex) * [p]
-                        data += num_flux_value
+            for i in mesh.outflow_boundary_cells(Dir.N):
 
-                        if mesh.is_outflow_boundary_cell(p, m):
+                row += 4 * [i]
+                col += [i, i-1, i+1, i-n_0]
+                data += [h_h * n_prod_N -
+                         flux_plus(n_prod_N, h_h) +
+                         flux_null(n_prod_E, h_v),
+                         flux_minus(n_prod_E, h_v),
+                         flux_plus(n_prod_E, h_v),
+                         flux_minus(n_prod_N, h_h)]
 
-                            col += [p]
-                            row += [p]
-                            data += [-n_prod]
+            for i in mesh.outflow_boundary_cells(Dir.W):
 
-                    if p == mesh.n_cells[0] - 1:
+                row += 4 * [i]
+                col += [i, i+1, i-n_0, i+n_0]
+                data += [h_v * n_prod_W -
+                         flux_minus(n_prod_E, h_v) +
+                         flux_null(n_prod_N, h_h),
+                         flux_plus(n_prod_E, h_v),
+                         flux_minus(n_prod_N, h_h),
+                         flux_plus(n_prod_N, h_h)]
 
-                        colIndex = num_flux_index(p - 1)
+            for i in mesh.outflow_boundary_cells(Dir.S):
 
-                        col += colIndex
-                        row += len(colIndex) * [p]
-                        data += [-value for value in num_flux_value]
+                row += 4 * [i]
+                col += [i, i-1, i+1, i+n_0]
+                data += [h_h * n_prod_S -
+                         flux_minus(n_prod_N, h_h) +
+                         flux_null(n_prod_E, h_v),
+                         flux_minus(n_prod_E, h_v),
+                         flux_plus(n_prod_E, h_v),
+                         flux_plus(n_prod_N, h_h)]
 
-                        if mesh.is_outflow_boundary_cell(p, m):
+            # # treat the corner cells separately
+            # sw_index = mesh.south_west_corner()
 
-                            col += [p]
-                            row += [p]
-                            data += [n_prod]
+            # row += 2 * [sw_index]
+            # col += [sw_index+1, sw_index+n_0]
+            # data += [flux_plus(n_prod_E, h_v),
+            #          flux_plus(n_prod_N, h_h)]
 
-            for p in mesh.interior_cells():
+            # if Dir.W in outflow_boundary():
 
-                colIndex0 = num_flux_index(p)
-                colIndex1 = num_flux_index(p - 1)
-                col += colIndex0 + colIndex1
+            #     row += [sw_index]
+            #     col += [sw_index]
+            #     data += [h_v * n_prod_E - flux_minus(n_prod_E, h_v)]
 
-                row += len(colIndex0) * [p]
-                row += len(colIndex1) * [p]
+            # if Dir.S in outflow_boundary():
 
-                data += num_flux_value
-                data += [-value for value in num_flux_value]
+            #     row += [sw_index]
+            #     col += [sw_index]
+            #     data += [h_h * n_prod_E - flux_minus(n_prod_E, h_v)]
 
+            # se_index = mesh.south_east_corner()
+
+            # row += 2 * [se_index]
+            # col += [se_index-1, se_index+n_0]
+            # data += [flux_minus(n_prod_E, h_v),
+            #          flux_plus(n_prod_N, h_h)]
+
+            # if Dir.S in outflow_boundary():
+
+            #     row += [se_index]
+            #     col += [se_index]
+            #     data += []
+
+            # if Dir.E in outflow_boundary():
+            #     pass
+
+            # ne_index = mesh.north_east_corner()
+            # if Dir.N in outflow_boundary():
+            #     pass
+            # if Dir.E in outflow_boundary():
+            #     pass
+
+            # nw_index = mesh.north_west_corner()
+            # if Dir.N in outflow_boundary():
+            #     pass
+            # if Dir.W in outflow_boundary():
+            #     pass
+
+            # TODO: define sparse matrix and remove zeros
             block_diag += [sps.coo_matrix(
                 (data, (row, col)),
-                shape=(mesh.n_cells[0], mesh.n_cells[0]))]
+                shape=(n_0, n_0))]
 
         return sps.block_diag(block_diag)
 

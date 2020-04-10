@@ -86,28 +86,35 @@ class UniformMesh:
         for d in range(dimension - 1):
             domain_str += ' x (0.0, ' + str(domain_length[d + 1]) + ')'
 
-        self.n_cells = n_cells[:dimension]
-
-        # compute total number of cells
-        self.n_tot = 1
-
-        for nc in self.n_cells:
-            self.n_tot *= nc
-
-        self.h = tuple(
-            map(lambda a, b: a / float(b), self.dom_len, self.n_cells))
-
-        # Outer normal vectors
         self.outer_normal = None
+        self.n_cells = None
+        self.h = None
 
         if dimension == 1:
+
             self.outer_normal = {Direction.E: np.array([1.0]),
                                  Direction.W: np.array([-1.0])}
-        elif dimension == 2:
+
+            self.n_cells = (n_cells[0], 1)
+
+            self.h = (self.dom_len[0] / float(n_cells[0]), 0.0)
+
+        else:
+
             self.outer_normal = {Direction.E: np.array([1.0, 0.0]),
                                  Direction.N: np.array([0.0, 1.0]),
                                  Direction.W: np.array([-1.0, 0.0]),
                                  Direction.S: np.array([0.0, -1.0])}
+
+            self.n_cells = n_cells[:dimension]
+
+            self.h = tuple(
+                map(lambda a, b: a / float(b), self.dom_len, self.n_cells))
+
+        # compute total number of cells
+        self.n_tot = 1
+        for nc in self.n_cells:
+            self.n_tot *= nc
 
         # i-th x-coordinate is given by entry [i, 0] in first tuple entry.
         # j-th y-coordinate is given by entry [0, j] in second tuple entry.
@@ -125,6 +132,17 @@ class UniformMesh:
               '    - total number of cells: ' + str(self.n_tot) + '\n' +
               '    - mesh size per dimension: ' + str(self.h) +
               '\n\n')
+
+        print(self.interior_cells())
+
+        for d in self.outer_normal:
+
+            print(self.boundary_cells(d))
+
+        print(self.south_west_corner())
+        print(self.south_east_corner())
+        print(self.north_west_corner())
+        print(self.north_east_corner())
 
     def integrate_cellwise(self, abs_fun, quad_method):
         """
@@ -164,104 +182,65 @@ class UniformMesh:
         return np.array([quadrature_fun(boundaries[i], boundaries[i + 1])
                          for i in range(self.n_cells[0])])
 
-    def inflow_boundary_cells(self, ord_index):
-        """
-        List of all cell indices corresponding to a cell, which has at
-        least one face on the inflow boundary of ordinate ord_index.
+    def outflow_boundary(self, ord_dir):
 
-        Parameters
-        ----------
-        ord_index : integer
-            Index of the desired ordinate
+        boundaries = []
 
-        Returns
-        -------
-        list of integers
-            List of the indices of the cells with part in the
-            inflow boundary of ord_index
-        """
+        for d in self.outer_normal:
 
-        if ord_index == 0:
+            if np.dot(self.outer_normal[d], ord_dir) > 0.0:
 
-            return [0]
+                boundaries += [d]
 
-        elif ord_index == 1:
-
-            return [-1]
-
-        else:
-            raise Exception('Invalid ordinate index')
-
-    def is_outflow_boundary_cell(self, cell, ord_index):
-        """
-        Test for a cell to be part of the outflow boundary
-
-        Parameters
-        ----------
-        cell : integer
-            Index of the cell to be tested
-        ord_index : integer
-            Index of the desired ordinate
-
-        Returns
-        -------
-        bool
-            True if cell has a part on the outflow boundary of ordinate
-            ord_index, False otherwise.
-        """
-
-        if ord_index == 0:
-
-            if cell == self.n_cells[0] - 1:
-                return True
-
-            else:
-                return False
-
-        elif ord_index == 1:
-
-            if cell == 0:
-                return True
-
-            else:
-                return False
-
-    def boundary_cells(self, direction):
-        """
-        Cells with part on the domain boudary in a certain direction
-
-        Parameters
-        ----------
-        direction : mesh.Direction
-            Direction, indicating the boudary
-
-        Returns
-        -------
-        range
-            Range of indices of the cells with part on the boundary
-            specified by the direction.
-        """
-
-        if direction == Direction.E:
-            return range(self.n_cells[0] - 1, self.n_cells[0])
-
-        elif direction == Direction.W:
-            return range(1)
-
-        else:
-            return range(0)
+        return boundaries
 
     def interior_cells(self):
-        """
-        Indices of the interior cells
 
-        Returns
-        -------
-        range
-            Range of indices of the interior cells of the domain.
-        """
+        # start with the lowest interior row
+        interior_row = np.arange(self.n_cells[0] + 1, 2 * self.n_cells[0] - 1)
+        interior_indices = interior_row
 
-        return range(1, self.n_cells[0] - 1)
+        if self.dim == 1:
+
+            return np.add(interior_indices, -self.n_cells[0])
+
+        else:
+
+            for row in range(self.n_cells[1] - 3):
+
+                # get indices of row above
+                interior_row = np.add(interior_row, self.n_cells[0])
+
+                # append to array storing all indices
+                interior_indices = np.concatenate(
+                    (interior_indices, interior_row))
+
+            return interior_indices
+
+    def boundary_cells(self, direction):
+
+        if direction == Direction.E:
+
+            return np.arange(start=self.n_cells[0] - 1, stop=self.n_tot,
+                             step=self.n_cells[0])
+
+        elif direction == Direction.N:
+
+            return np.arange(start=(self.n_cells[1] - 1) * self.n_cells[0],
+                             stop=self.n_tot)
+
+        elif direction == Direction.W:
+
+            return np.arange(start=0,
+                             stop=(self.n_cells[1] - 1) * self.n_cells[0] + 1,
+                             step=self.n_cells[0])
+
+        elif direction == Direction.S:
+
+            return np.arange(start=0, stop=self.n_cells[0])
+
+        else:
+            raise Exception('Unknown direction ' + str(direction))
 
     def cell_centers(self):
         """
@@ -276,3 +255,19 @@ class UniformMesh:
 
         return np.arange(
             0.5 * self.h[0], self.n_cells[0] * self.h[0], self.h[0])
+
+    def south_west_corner(self):
+
+        return 0
+
+    def south_east_corner(self):
+
+        return self.n_cells[0] - 1
+
+    def north_west_corner(self):
+
+        return (self.n_cells[1] - 1) * self.n_cells[0]
+
+    def north_east_corner(self):
+
+        return self.n_tot - 1

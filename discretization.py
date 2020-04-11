@@ -169,13 +169,13 @@ class FiniteVolume1d:
         #                           MATRIX ASSEMBLY
         # --------------------------------------------------------------------
 
-        t0 = timeit.default_timer()
-        print(mesh.integrate_cellwise(mp.abs_fun, quadrature).shape)
-        alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun, quadrature),
-                              reps=(self.n_ord, 1))
+        # t0 = timeit.default_timer()
+        # print(mesh.integrate_cellwise(mp.abs_fun, quadrature).shape)
+        # alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun, quadrature),
+        #                       reps=(self.n_ord, 1))
 
-        t1 = timeit.default_timer() - t0
-        print('alpha: ' + "% 10.3e" % (t1))
+        # t1 = timeit.default_timer() - t0
+        # print('alpha: ' + "% 10.3e" % (t1))
 
         # timing and assembly of the discretized transport term
         t0 = timeit.default_timer()
@@ -432,9 +432,19 @@ class FiniteVolume1d:
                         col += [se_index, sw_index]
                         data += 2 * [h_h * n_prod_S]
 
+            # remove the zero entries from the matrix
+            row = np.array(row)
+            col = np.array(col)
+            data = np.array(data)
+
+            zeros = np.where(np.abs(data) < 1e-12 * min(mesh.h))[0]
+
+            row = np.delete(row, zeros)
+            col = np.delete(col, zeros)
+            data = np.delete(data, zeros)
+
             block_diag += [sps.coo_matrix((data, (row, col)),
                                           shape=(mesh.n_tot, mesh.n_tot))]
-            print(block_diag[m].toarray())
 
         return sps.block_diag(block_diag)
 

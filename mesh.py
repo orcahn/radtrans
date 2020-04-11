@@ -138,17 +138,6 @@ class UniformMesh:
               '    - mesh size per dimension: ' + str(self.h) +
               '\n\n')
 
-        # print(self.interior_cells())
-
-        # for d in self.outer_normal:
-
-        #     print(self.boundary_cells(d))
-
-        # print(self.south_west_corner())
-        # print(self.south_east_corner())
-        # print(self.north_west_corner())
-        # print(self.north_east_corner())
-
     def integrate_cellwise(self, abs_fun, quad_method):
         """
         Compute the L2 scalar product of a function with the basis functions
@@ -226,7 +215,8 @@ class UniformMesh:
 
         if direction == Direction.E:
 
-            return np.arange(start=self.n_cells[0] - 1, stop=self.n_tot,
+            return np.arange(start=2 * self.n_cells[0] - 1,
+                             stop=self.n_tot - 1,
                              step=self.n_cells[0])
 
         elif direction == Direction.N:
@@ -234,13 +224,14 @@ class UniformMesh:
             if self.dim == 1:
                 return []
             else:
-                return np.arange(start=(self.n_cells[1] - 1) * self.n_cells[0],
-                                 stop=self.n_tot)
+                return np.arange(
+                    start=(self.n_cells[1] - 1) * self.n_cells[0] + 1,
+                    stop=self.n_tot - 1)
 
         elif direction == Direction.W:
 
-            return np.arange(start=0,
-                             stop=(self.n_cells[1] - 1) * self.n_cells[0] + 1,
+            return np.arange(start=self.n_cells[0],
+                             stop=(self.n_cells[1] - 1) * self.n_cells[0],
                              step=self.n_cells[0])
 
         elif direction == Direction.S:
@@ -248,7 +239,7 @@ class UniformMesh:
             if self.dim == 1:
                 return []
             else:
-                return np.arange(start=0, stop=self.n_cells[0])
+                return np.arange(start=1, stop=self.n_cells[0] - 1)
 
         else:
             raise Exception('Unknown direction ' + str(direction))

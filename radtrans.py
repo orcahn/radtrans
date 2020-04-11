@@ -44,19 +44,42 @@ class RadiativeTransfer:
         abs_type = config['MODEL']['absorptionType']
         absorption_coeff = absorption.Absorption(abs_type, domain)
 
-        boundary_values = [
-            float(
-                e.strip()) for e in config.get(
-                'MODEL',
-                'boundaryValues').split(',')]
-
-        self.method = str(config['DISCRETIZATION']['method'])
-
         n_cells = tuple(
             map(int,
                 config['DISCRETIZATION']['n_cells'].strip().split(',')))
         n_ordinates = int(config['DISCRETIZATION']['n_ordinates'])
         flux = str(config['DISCRETIZATION']['flux'])
+
+        boundary_values = None
+
+        if config['BOUNDARY_VALUES']['type'] == 'uniform':
+
+            boundary_values = tuple(config['BOUNDARY_VALUES']['value']
+                                    for m in range(n_ordinates))
+
+        elif config['BOUNDARY_VALUES']['type'] == 'inc_east':
+
+            boundary_values = (1.0, *[0.0 for m in range(n_ordinates)])
+
+        elif config['BOUNDARY_VALUES']['type'] == 'manual':
+
+            boundary_values = tuple(
+                map(float,
+                    config['BOUNDARY_VALUES']['valArray'].strip().split(',')))
+
+        else:
+
+            n_bndry_val = len(list(
+                map(float,
+                    config['BOUNDARY_VALUES']['valArray'].strip().split(','))))
+
+            sys.exit('Option \'manual\' was chosen for the boundary\n' +
+                     'values. Provided number of boundary values (' +
+                     str(n_ordinates) + ')\ndid not match provided number' +
+                     'of discrete ordinates, which is ' + str(n_bndry_val) +
+                     '.')
+
+        self.method = str(config['DISCRETIZATION']['method'])
 
         solver_name = str(config['SOLVER']['solver'])
         assert solver_name in ['SparseDirect', 'GMRES', 'BiCGSTAB'], \

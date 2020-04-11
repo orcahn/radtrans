@@ -72,8 +72,8 @@ class FiniteVolume1d:
     and matrix vector operations needed in the solvers.
     """
 
-    def __init__(self, mp, mesh, n_ordinates, numerical_flux='upwind',
-                 quadrature='midpoint'):
+    def __init__(self, mp, mesh, n_ordinates, inflow_bc,
+                 numerical_flux='upwind', quadrature='midpoint'):
         """
         Parameters
         ----------
@@ -97,6 +97,11 @@ class FiniteVolume1d:
         self.n_ord = n_ordinates if mesh.dim == 2 else 2
 
         self.n_dof = self.n_ord * mesh.n_tot
+
+        if mesh.dim == 1:
+            assert len(inflow_bc) == 2, \
+                'Invalid inflow boundary conditions. ' + \
+                'For a 1d problem there must be exactly 2 conditions.'
 
         assert numerical_flux in ['upwind', 'centered'], \
             'Numerical flux ' + numerical_flux + ' not implemented.'
@@ -164,13 +169,13 @@ class FiniteVolume1d:
         #                           MATRIX ASSEMBLY
         # --------------------------------------------------------------------
 
-        # t0 = timeit.default_timer()
-        # print(mesh.integrate_cellwise(mp.abs_fun, quadrature).shape)
-        # alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun, quadrature),
-        #                       reps=(self.n_ord, 1))
+        t0 = timeit.default_timer()
+        print(mesh.integrate_cellwise(mp.abs_fun, quadrature).shape)
+        alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun, quadrature),
+                              reps=(self.n_ord, 1))
 
-        # t1 = timeit.default_timer() - t0
-        # print('alpha: ' + "% 10.3e" % (t1))
+        t1 = timeit.default_timer() - t0
+        print('alpha: ' + "% 10.3e" % (t1))
 
         # timing and assembly of the discretized transport term
         t0 = timeit.default_timer()
@@ -239,7 +244,7 @@ class FiniteVolume1d:
         # add boundary conditions
         for m in range(n_ordinates):
             self.load_vec[mesh.inflow_boundary_cells(m)] += \
-                mp.inflow_bc[m]
+                inflow_bc[m]
 
         t1 = timeit.default_timer() - t0
         print('load vector: ' + "% 10.3e" % (t1) + '\n')

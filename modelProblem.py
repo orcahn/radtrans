@@ -90,11 +90,6 @@ class ModelProblem:
             ' in the domain as argument.'
         self.abs_fun = absorption_fun
 
-        assert len(inflow_bc) == 2, \
-            'Invalid inflow boundary conditions.' + \
-            'For a 1d problem there must be exactly 2 conditions.'
-        self.inflow_bc = inflow_bc
-
         print('\n\nModel problem:\n' +
               '--------------\n' +
               '    - temperature: ' + str(temperature) + ' K\n' +

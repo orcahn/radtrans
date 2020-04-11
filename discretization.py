@@ -119,7 +119,16 @@ class FiniteVolume1d:
         t0 = timeit.default_timer()
 
         # list of directions of the discrete ordinates
-        ord_dir = [np.array([1.0]), np.array([-1.0])]
+        if mesh.dim == 1:
+            ord_dir = [np.array([1.0]), np.array([-1.0])]
+
+        else:
+
+            # 'equidistant' on the unit circle
+            piM = 2.0 * np.pi / float(n_ordinates)
+
+            ord_dir = [np.array([np.cos(m * piM), np.sin(m * piM)])
+                       for m in np.arange(n_ordinates, dtype=np.single)]
 
         if mesh.dim == 1 and n_ordinates != 2:
             print('Warning: In one dimension two discrete ordinates' +
@@ -152,13 +161,13 @@ class FiniteVolume1d:
         #                           MATRIX ASSEMBLY
         # --------------------------------------------------------------------
 
-        t0 = timeit.default_timer()
-        print(mesh.integrate_cellwise(mp.abs_fun, quadrature).shape)
-        alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun, quadrature),
-                              reps=(self.n_ord, 1))
+        # t0 = timeit.default_timer()
+        # print(mesh.integrate_cellwise(mp.abs_fun, quadrature).shape)
+        # alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun, quadrature),
+        #                       reps=(self.n_ord, 1))
 
-        t1 = timeit.default_timer() - t0
-        print('alpha: ' + "% 10.3e" % (t1))
+        # t1 = timeit.default_timer() - t0
+        # print('alpha: ' + "% 10.3e" % (t1))
 
         # timing and assembly of the discretized transport term
         t0 = timeit.default_timer()

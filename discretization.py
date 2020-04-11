@@ -72,8 +72,8 @@ class FiniteVolume1d:
     and matrix vector operations needed in the solvers.
     """
 
-    def __init__(self, mp, mesh, n_ordinates, do_weights=0,
-                 numerical_flux='upwind', quadrature='midpoint'):
+    def __init__(self, mp, mesh, n_ordinates, numerical_flux='upwind',
+                 quadrature='midpoint'):
         """
         Parameters
         ----------
@@ -139,20 +139,23 @@ class FiniteVolume1d:
 
         if mp.scat == 'isotropic':
 
-            assert do_weights != 0, \
-                'For isotropic scattering, quadrature weights for the ' + \
-                'discrete ordinates must be provided.'
+            # ordinate weights could in principle be chosen arbitrarily,
+            # however we chose them such, that energy conservation is satisfied
+            do_weights = None
+            scat_prob = None
 
-            assert len(do_weights) == n_ordinates, \
-                'Number of quadrature weights provided and number of ' + \
-                'discrete ordinates do not match.'
+            if mesh.dim == 1:
+                do_weights = np.array([1.0, 1.0])
+                scat_prob = np.array([0.5, 0.5])
 
-            # scattering probability for all discrete ordinates
-            scat_prob = 1.0 / ((2.0 * np.pi)**(mesh.dim - 1) * 2.0)
+            else:
+                do_weights = np.full(n_ordinates,
+                                     2.0 * np.pi / float(n_ordinates))
+                scat_prob = np.full(n_ordinates, 0.5 / np.pi)
 
-            for i in range(self.n_ord):
-                for j in range(self.n_ord):
-                    sig[i, j] = do_weights[i] * scat_prob
+        for i in range(self.n_ord):
+            for j in range(self.n_ord):
+                sig[i, j] = do_weights[i] * scat_prob[j]
 
         t1 = timeit.default_timer() - t0
         print('scattering coefficients: ' + "% 10.3e" % (t1))

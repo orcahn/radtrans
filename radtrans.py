@@ -50,12 +50,6 @@ class RadiativeTransfer:
                 'MODEL',
                 'boundaryValues').split(',')]
 
-        quadrature_weights = [
-            float(
-                e.strip()) for e in config.get(
-                'MODEL',
-                'quadratureWeights').split(',')]
-
         self.method = str(config['DISCRETIZATION']['method'])
 
         n_cells = tuple(
@@ -97,14 +91,12 @@ class RadiativeTransfer:
         if scattering == 'isotropic':
 
             disc = discretization.FiniteVolume1d(
-                model_problem, self.mesh, n_ordinates, quadrature_weights,
-                flux)
+                model_problem, self.mesh, n_ordinates, flux)
 
         else:
 
             disc = discretization.FiniteVolume1d(
-                model_problem, self.mesh, n_ordinates, quadrature_weights,
-                flux)
+                model_problem, self.mesh, n_ordinates, flux)
 
         elapsed_time = timeit.default_timer() - start_time
 

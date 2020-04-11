@@ -13,7 +13,7 @@ class Direction(IntEnum):
 
 def midpoint(a, b, fun, h):
 
-    return h * fun(0.5 * (a + b))
+    return (h[0] * h[1]) * fun(0.5 * (a + b))
 
 
 def trapezoidal(a, b, fun, h):
@@ -93,11 +93,16 @@ class UniformMesh:
         if dimension == 1:
 
             self.outer_normal = {Direction.E: np.array([1.0]),
-                                 Direction.W: np.array([-1.0])}
+                                 Direction.N: np.array([0.0]),
+                                 Direction.W: np.array([-1.0]),
+                                 Direction.S: np.array([0.0])}
 
             self.n_cells = (n_cells[0], 1)
 
-            self.h = (self.dom_len[0] / float(n_cells[0]), 0.0)
+            # this is a hack for discretization in 1 dimension to
+            # work properly. In this case h does not have the
+            # meaning of mesh size.
+            self.h = (0.0, 1.0)
 
         else:
 
@@ -133,16 +138,16 @@ class UniformMesh:
               '    - mesh size per dimension: ' + str(self.h) +
               '\n\n')
 
-        print(self.interior_cells())
+        # print(self.interior_cells())
 
-        for d in self.outer_normal:
+        # for d in self.outer_normal:
 
-            print(self.boundary_cells(d))
+        #     print(self.boundary_cells(d))
 
-        print(self.south_west_corner())
-        print(self.south_east_corner())
-        print(self.north_west_corner())
-        print(self.north_east_corner())
+        # print(self.south_west_corner())
+        # print(self.south_east_corner())
+        # print(self.north_west_corner())
+        # print(self.north_east_corner())
 
     def integrate_cellwise(self, abs_fun, quad_method):
         """
@@ -226,8 +231,11 @@ class UniformMesh:
 
         elif direction == Direction.N:
 
-            return np.arange(start=(self.n_cells[1] - 1) * self.n_cells[0],
-                             stop=self.n_tot)
+            if self.dim == 1:
+                return []
+            else:
+                return np.arange(start=(self.n_cells[1] - 1) * self.n_cells[0],
+                                 stop=self.n_tot)
 
         elif direction == Direction.W:
 
@@ -237,7 +245,10 @@ class UniformMesh:
 
         elif direction == Direction.S:
 
-            return np.arange(start=0, stop=self.n_cells[0])
+            if self.dim == 1:
+                return []
+            else:
+                return np.arange(start=0, stop=self.n_cells[0])
 
         else:
             raise Exception('Unknown direction ' + str(direction))

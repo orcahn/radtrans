@@ -24,7 +24,7 @@ class RadiativeTransfer:
     def main(self, argv):
 
         # parse parameter file
-        config = configparser.ConfigParser()
+        config = configparser.ConfigParser(allow_no_value=True)
         config.read(argv[1:])
 
         dimension = int(config['MODEL']['dimension'])

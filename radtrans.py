@@ -47,7 +47,11 @@ class RadiativeTransfer:
         n_cells = tuple(
             map(int,
                 config['DISCRETIZATION']['n_cells'].strip().split(',')))
-        n_ordinates = int(config['DISCRETIZATION']['n_ordinates'])
+
+        # in one dimension there are only two possible discrete ordinates
+        n_ordinates = 2 if dimension == 1 else \
+            int(config['DISCRETIZATION']['n_ordinates'])
+
         flux = str(config['DISCRETIZATION']['flux'])
 
         boundary_values = None
@@ -59,7 +63,7 @@ class RadiativeTransfer:
 
         elif config['BOUNDARY_VALUES']['type'] == 'inc_east':
 
-            boundary_values = (1.0, *[0.0 for m in range(n_ordinates)])
+            boundary_values = (1.0, *[0.0 for m in range(n_ordinates - 1)])
 
         elif config['BOUNDARY_VALUES']['type'] == 'manual':
 
@@ -114,12 +118,12 @@ class RadiativeTransfer:
         if scattering == 'isotropic':
 
             disc = discretization.FiniteVolume1d(
-                model_problem, self.mesh, n_ordinates, flux)
+                model_problem, self.mesh, n_ordinates, boundary_values, flux)
 
         else:
 
             disc = discretization.FiniteVolume1d(
-                model_problem, self.mesh, n_ordinates, flux)
+                model_problem, self.mesh, n_ordinates, boundary_values, flux)
 
         elapsed_time = timeit.default_timer() - start_time
 

@@ -94,10 +94,9 @@ class FiniteVolume1d:
         """
 
         self.n_ord = n_ordinates
-
         self.n_dof = self.n_ord * mesh.n_tot
+        self.inflow_bc = inflow_bc
 
-        print(inflow_bc)
         if mesh.dim == 1:
             assert len(inflow_bc) == 2, \
                 'Invalid inflow boundary conditions. ' + \
@@ -237,12 +236,27 @@ class FiniteVolume1d:
         # --------------------------------------------------------------------
 
         t0 = timeit.default_timer()
-        self.load_vec = mp.emiss * mp.s_e * alpha_tiled
+        self.load_vec = mp.emiss * mp.s_e * np.ravel(alpha_tiled)
 
         # add boundary conditions
         for m in range(n_ordinates):
-            self.load_vec[mesh.inflow_boundary_cells(m)] += \
-                inflow_bc[m]
+
+            in_bndry = mesh.inflow_boundary(ord_dir[m])
+
+            for d in [Dir.E, Dir.W]:
+
+                if d in in_bndry:
+
+                    self.load_vec[mesh.boundary_cells(d)] -= \
+                        mesh.h[1] * np.dot(ord_dir[m], mesh.outer_normal[d]) *\
+                        self.inflow_bc[m]
+
+            for d in [Dir.N, Dir.S]:
+
+                if d in in_bndry:
+                    self.load_vec[mesh.boundary_cells(d)] -= \
+                        mesh.h[0] * np.dot(ord_dir[m], mesh.outer_normal[d]) *\
+                        self.inflow_bc[m]
 
         t1 = timeit.default_timer() - t0
         print('load vector: ' + "% 10.3e" % (t1) + '\n')

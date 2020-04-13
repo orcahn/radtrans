@@ -117,6 +117,14 @@ class UniformMesh:
             self.h = tuple(
                 map(lambda a, b: a / float(b), self.dom_len, self.n_cells))
 
+            # cell centers as a meshgrid
+            x_centers = np.arange(
+                0.5 * self.h[0], self.n_cells[0] * self.h[0], self.h[0])
+            y_centers = np.arange(
+                0.5 * self.h[1], self.n_cells[1] * self.h[1], self.h[1])
+            self.centers = np.meshgrid(x_centers, y_centers,
+            indexing='ij', copy=False)
+
         # compute total number of cells
         self.n_tot = 1
         for nc in self.n_cells:

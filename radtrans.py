@@ -10,6 +10,7 @@ import absorption
 import mesh
 import discretization
 import solver
+import visualization
 
 
 class RadiativeTransfer:
@@ -83,7 +84,7 @@ class RadiativeTransfer:
                      'of discrete ordinates, which is ' + str(n_bndry_val) +
                      '.')
 
-        self.method = str(config['DISCRETIZATION']['method'])
+        method = str(config['DISCRETIZATION']['method'])
 
         solver_name = str(config['SOLVER']['solver'])
         assert solver_name in ['SparseDirect', 'GMRES', 'BiCGSTAB'], \
@@ -97,7 +98,7 @@ class RadiativeTransfer:
         assert prec_type in ['none', 'lambdaIteration', 'diagonal'], \
             'Preconditioner ' + prec_type + ' currently not supported.'
 
-        self.outputType = str(config['OUTPUT']['type'])
+        outputType = str(config['OUTPUT']['type'])
 
         # define model problem and discretization
         model_problem = modelProblem.ModelProblem(
@@ -110,7 +111,7 @@ class RadiativeTransfer:
         elapsed_time = timeit.default_timer() - start_time
         mesh_time = elapsed_time
 
-        assert(self.method == 'finiteVolume')
+        assert(method == 'finiteVolume')
 
         # time matrix and load vector assembly
         start_time = timeit.default_timer()
@@ -180,43 +181,13 @@ class RadiativeTransfer:
 
         linear_solver = solver.Solver(solver_name, prec)
 
-        self.x, self.iters, self.elapsed_time = linear_solver.solve(A, b, x_in)
+        x, iters, elapsed_time = linear_solver.solve(A, b, x_in)
 
-    def output_results(self):
-
-        if self.outputType == "firstOrdinate":
-
-            if self.method == "finiteVolume":
-
-                plt.step(self.mesh.cell_centers(),
-                         self.x[:self.mesh.n_cells[0]])
-
-            else:
-
-                plt.plot(self.mesh.cell_centers(),
-                         self.x[:self.mesh.n_cells[0]])
-
-        elif self.outputType == "meanIntensity":
-
-            if self.method == "finiteVolume":
-
-                plt.step(self.mesh.cell_centers(), np.mean(
-                    (self.x[self.mesh.n_cells[0]:],
-                     self.x[:self.mesh.n_cells[0]]),
-                    axis=0))
-
-            else:
-
-                plt.plot(self.mesh.cell_centers(), np.mean(
-                    (self.x[self.mesh.n_cells[0]:],
-                     self.x[:self.mesh.n_cells[0]]),
-                    axis=0))
-
-        plt.show()
+        self.visu = visualization.Visualization(dimension,method,x,self.mesh,n_ordinates,outputType)
 
 
 if __name__ == "__main__":
 
     radtrans = RadiativeTransfer()
     radtrans.main(sys.argv)
-    radtrans.output_results()
+    radtrans.visu.visualize()

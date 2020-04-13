@@ -11,14 +11,15 @@ class Direction(IntEnum):
     S = 3       # south
 
 
-def midpoint(a, b, fun, h):
+def quadrature(fun, w, qn):
 
-    return (h[0] * h[1]) * fun(0.5 * (a + b))
+    integral = 0.0
 
+    for q in range(len(w)):
+        for p in range(len(w)):
+            integral += w[q][0] * w[p][1] * fun([qn[q][0], qn[p][1]])
 
-def trapezoidal(a, b, fun, h):
-
-    return 0.5 * h * (fun(a) + fun(b))
+    return integral
 
 
 class UniformMesh:
@@ -138,7 +139,31 @@ class UniformMesh:
               '    - mesh size per dimension: ' + str(self.h) +
               '\n\n')
 
-    def integrate_cellwise(self, abs_fun, quad_method):
+    def __integrate_cellwise_1d__(self, abs_fun, quad_method):
+
+        # In a typical application, cell sizes are so small that low order
+        # quadrature is of acceptable accuracy. Tests showed, that higher order
+        # methods did not significantly improve accuracy, but imposed a
+        # high performance overhead.
+        if quad_method == 'midpoint':
+
+            def quadrature(a, b, fun, h):
+
+                return h * fun([0.5 * (a + b)])
+
+        else:
+
+            def quadrature(a, b, fun, h):
+
+                return 0.5 * h * (fun([a]) + fun([b]))
+
+        def q_fun(a, b): return quadrature(a, b, abs_fun,
+                                           self.dom_len[0] / self.n_cells[0])
+
+        return np.array([q_fun(self.grid[0][i], self.grid[0][i+1])
+                         for i in range(self.n_cells[0])])
+
+    def __integrate_cellwise_2d__(self, abs_fun, quad_method):
         """
         Compute the L2 scalar product of a function with the basis functions
         corresponding to each cell.
@@ -162,19 +187,46 @@ class UniformMesh:
         # quadrature is of acceptable accuracy. Tests showed, that higher order
         # methods did not significantly improve accuracy, but imposed a
         # high performance overhead.
-        quadrature_fun = None
-
         if quad_method == 'midpoint':
-            def quadrature_fun(a, b): return midpoint(a, b, abs_fun, self.h[0])
+
+            weights = [[self.h[0], self.h[1]]]
+
+            def nodes(cell):
+
+                # 2d indices of global indexing of cell
+                i = cell % self.n_cells[0]
+                j = (cell - i) // self.n_cells[0]
+
+                return [[0.5 * (self.grid[0][i, 0] +
+                                self.grid[0][i+1, 0]),
+                         0.5 * (self.grid[1][0, j] +
+                                self.grid[1][0, j+1])]]
+
         else:
-            def quadrature_fun(a, b): return trapezoidal(
-                a, b, abs_fun, self.h[0])
 
-        boundaries = np.linspace(0.0, self.dom_len, num=self.n_cells[0] + 1,
-                                 endpoint=True, retstep=False)
+            weights = [2 * [0.5 * self.h[0], 0.5 * self.h[1]]]
 
-        return np.array([quadrature_fun(boundaries[i], boundaries[i + 1])
-                         for i in range(self.n_cells[0])])
+            def nodes(cell):
+
+                # 2d indices of global indexing of cell
+                i = cell % self.n_cells[0]
+                j = (cell - i) // self.n_cells[0]
+
+                return [[self.grid[0][i, 0],
+                         self.grid[1][0, j]],
+                        [self.grid[0][i+1, 0],
+                         self.grid[1][0, j+1]]]
+
+        def q_fun(cell): return quadrature(abs_fun, weights, nodes(cell))
+
+        return np.array([q_fun(cell) for cell in range(self.n_tot)])
+
+    def integrate_cellwise(self, abs_fun, quad_method):
+
+        if self.dim == 1:
+            return self.__integrate_cellwise_1d__(abs_fun, quad_method)
+        else:
+            return self.__integrate_cellwise_2d__(abs_fun, quad_method)
 
     def outflow_boundary(self, ord_dir):
 
@@ -183,6 +235,18 @@ class UniformMesh:
         for d in self.outer_normal:
 
             if np.dot(self.outer_normal[d], ord_dir) > 0.0:
+
+                boundaries += [d]
+
+        return boundaries
+
+    def inflow_boundary(self, ord_dir):
+
+        boundaries = []
+
+        for d in self.outer_normal:
+
+            if np.dot(self.outer_normal[d], ord_dir) < 0.0:
 
                 boundaries += [d]
 

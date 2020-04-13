@@ -1,35 +1,49 @@
 import numpy as np
 
+from numpy.linalg import norm
+
 
 # test case: no absorption
-def no_abs(x, L):
+def no_abs(x):
 
-    return np.zeros(x.shape)
+    return 0.0
 
 
 # constant absorption throughout the domain. Recovers the case of
 # homogeneous medium in the domain
-def const_abs(x, L):
+def const_abs(x):
 
-    return np.full(x.shape, 1.0)
+    return 1.0
 
 
 # positive gradient from 0.0 at 0 to 1.0 at L
 def pos_grad_abs(x, L):
 
-    return x / L
+    return x[0] / L[0]
 
 
 # gaussian with stddev 1.0, centered at L/2
 def gaussian_abs(x, L):
 
-    return np.exp(-0.5 * (x - 0.5 * L) * (x - 0.5 * L)) / np.sqrt(2.0 * np.pi)
+    res = np.exp(-0.5 * (x[0] - 0.5 * L[0]) *
+                 (x[0] - 0.5 * L[0])) / np.sqrt(2.0 * np.pi)
+
+    if len(x) == 2:
+
+        res *= np.exp(-0.5 * (x[1] - 0.5 * L[1]) *
+                      (x[1] - 0.5 * L[1])) / np.sqrt(2.0 * np.pi)
+    
+    return res
 
 
 # discontinuous absorption coefficient
 def step_abs(x, L):
 
-    return np.heaviside(x - L[0] / 2.0, 1.0)
+    dist = [x[d] - L[d] / 2.0 for d in range(len(x))]
+    if norm(dist) < min(L) / 4.0:
+        return 1.0
+    else:
+        return 0.0
 
 
 # piecewise constant absorption with random values
@@ -72,11 +86,11 @@ class Absorption:
 
         if abs_fun_type == 'none':
 
-            self.abs_fun = lambda x: no_abs(x, domain_length)
+            self.abs_fun = lambda x: no_abs(x)
 
         elif abs_fun_type == 'const':
 
-            self.abs_fun = lambda x: const_abs(x, domain_length)
+            self.abs_fun = lambda x: const_abs(x)
 
         elif abs_fun_type == 'posGrad':
 
@@ -92,7 +106,7 @@ class Absorption:
 
         elif abs_fun_type == 'gaussianRandomPiecewise':
 
-            num_intervals = int(domain_length)*2
+            num_intervals = int(domain_length * 2)
 
             # Samples from a Gaussian distribution with mean 0.5
             # and standard deviation 0.15

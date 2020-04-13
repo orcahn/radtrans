@@ -93,11 +93,11 @@ class FiniteVolume1d:
             Quadrature method to be used in computation of matrix entries
         """
 
-        # in one dimension there are only two possible discrete ordinates
-        self.n_ord = n_ordinates if mesh.dim == 2 else 2
+        self.n_ord = n_ordinates
 
         self.n_dof = self.n_ord * mesh.n_tot
 
+        print(inflow_bc)
         if mesh.dim == 1:
             assert len(inflow_bc) == 2, \
                 'Invalid inflow boundary conditions. ' + \
@@ -169,13 +169,11 @@ class FiniteVolume1d:
         #                           MATRIX ASSEMBLY
         # --------------------------------------------------------------------
 
-        # t0 = timeit.default_timer()
-        # print(mesh.integrate_cellwise(mp.abs_fun, quadrature).shape)
-        # alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun, quadrature),
-        #                       reps=(self.n_ord, 1))
-
-        # t1 = timeit.default_timer() - t0
-        # print('alpha: ' + "% 10.3e" % (t1))
+        t0 = timeit.default_timer()
+        alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun, quadrature),
+                              reps=(1, self.n_ord))
+        t1 = timeit.default_timer() - t0
+        print('alpha: ' + "% 10.3e" % (t1))
 
         # timing and assembly of the discretized transport term
         t0 = timeit.default_timer()
@@ -185,7 +183,7 @@ class FiniteVolume1d:
 
         # timing and assembly of the discretized absorption term
         t0 = timeit.default_timer()
-        a_mat = self.__assemble_absorption__(mesh, alpha_tiled, mp.xip1)
+        a_mat = self.__assemble_absorption__(alpha_tiled, mp.xip1)
         t1 = timeit.default_timer() - t0
         print('absorption: ' + "% 10.3e" % (t1))
 
@@ -207,7 +205,7 @@ class FiniteVolume1d:
             # timing and assembly of the discretize scattering terms
             t0 = timeit.default_timer()
             s_mat = self.__assemble_scattering__(
-                mesh, alpha_tiled[:mesh.n_cells[0]], sig, mp.xi)
+                alpha_tiled[:, :mesh.n_tot], sig, mp.xi)
             t1 = timeit.default_timer() - t0
             print('scattering: ' + "% 10.3e" % (t1))
 
@@ -448,16 +446,16 @@ class FiniteVolume1d:
 
         return sps.block_diag(block_diag)
 
-    def __assemble_absorption__(self, mesh, alpha_tiled, xip1):
+    def __assemble_absorption__(self, alpha_tiled, xip1):
 
         # for the pure absorption part, there is neither a coupling between
-        # neighbouring cells nor between different ordinates, the the resulting
+        # neighbouring cells nor between different ordinates. The resulting
         # matrix is diagonal.
-        print(alpha_tiled.shape)
-        return sps.diags(np.ravel(alpha_tiled), format='coo',
+
+        return sps.diags(xip1 * np.ravel(alpha_tiled), format='coo',
                          shape=(self.n_dof, self.n_dof))
 
-    def __assemble_scattering__(self, mesh, alpha, sig, xi):
+    def __assemble_scattering__(self, alpha, sig, xi):
 
         # For the scattering part there is no coupling between
         # neighbouring cells, however there is coupling between

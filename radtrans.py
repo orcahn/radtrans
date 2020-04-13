@@ -157,11 +157,11 @@ class RadiativeTransfer:
 
             elif initial_guess == "noScattering":
 
-                sol1 = model_problem.inflow_bc[0] * \
+                sol1 = disc.inflow_bc[0] * \
                     np.exp(-self.mesh.cell_centers()) + model_problem.s_e * \
                     (1 - np.exp(-self.mesh.cell_centers()))
 
-                sol2 = model_problem.inflow_bc[1] * \
+                sol2 = disc.inflow_bc[1] * \
                     np.exp(-self.mesh.cell_centers()[::-1]) + \
                     model_problem.s_e * \
                     (1 - np.exp(-self.mesh.cell_centers()[::-1]))

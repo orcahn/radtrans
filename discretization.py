@@ -134,20 +134,15 @@ class FiniteVolume1d:
             ord_dir = [np.array([np.cos(m * piM), np.sin(m * piM)])
                        for m in np.arange(n_ordinates, dtype=np.single)]
 
-        if mesh.dim == 1 and n_ordinates != 2:
-            print('Warning: In one dimension two discrete ordinates' +
-                  '(+1.0, -1.0) will be used!')
-
         # scattering coefficients for the chosen process
-        sig = np.zeros((self.n_ord, self.n_ord))
+        sig = np.empty((self.n_ord, self.n_ord))
+        do_weights = np.zeros(n_ordinates)
+        scat_prob = np.zeros(n_ordinates)
 
         if mp.scat == 'isotropic':
 
             # ordinate weights could in principle be chosen arbitrarily,
             # however we chose them such, that energy conservation is satisfied
-            do_weights = None
-            scat_prob = None
-
             if mesh.dim == 1:
                 do_weights = np.array([1.0, 1.0])
                 scat_prob = np.array([0.5, 0.5])
@@ -188,7 +183,7 @@ class FiniteVolume1d:
 
         if mp.scat == 'none':
 
-            self.lambda_prec = None
+            self.lambda_prec = sps.identity(self.n_dof)
 
             # Combine transport and absorption parts. By default
             # when converting to CSR or CSC format, duplicate
@@ -368,11 +363,17 @@ class FiniteVolume1d:
 
                 if Dir.E in out_bndry:
 
-                    row += [i]
-                    col += [i]
-                    data += [h_v * n_prod_E]
+                    if mesh.dim == 1:
 
-                    if mesh.dim == 2:
+                        row += [mesh.n_cells[0] - 1]
+                        col += [mesh.n_cells[0] - 1]
+                        data += [h_v * n_prod_E]
+
+                    else:
+
+                        row += [i]
+                        col += [i]
+                        data += [h_v * n_prod_E]
 
                         row += [se_index, ne_index]
                         col += [se_index, ne_index]
@@ -390,11 +391,11 @@ class FiniteVolume1d:
 
                 if Dir.N in out_bndry:
 
-                    row += [i]
-                    col += [i]
-                    data += [h_h * n_prod_N]
-
                     if mesh.dim == 2:
+
+                        row += [i]
+                        col += [i]
+                        data += [h_h * n_prod_N]
 
                         row += [ne_index, nw_index]
                         col += [ne_index, nw_index]
@@ -412,11 +413,17 @@ class FiniteVolume1d:
 
                 if Dir.W in out_bndry:
 
-                    row += [i]
-                    col += [i]
-                    data += [h_v * n_prod_W]
+                    if mesh.dim == 1:
 
-                    if mesh.dim == 2:
+                        row += [0]
+                        col += [0]
+                        data += [h_v * n_prod_W]
+
+                    else:
+
+                        row += [i]
+                        col += [i]
+                        data += [h_v * n_prod_W]
 
                         row += [sw_index, nw_index]
                         col += [sw_index, nw_index]
@@ -434,11 +441,11 @@ class FiniteVolume1d:
 
                 if Dir.S in out_bndry:
 
-                    row += [i]
-                    col += [i]
-                    data += [h_h * n_prod_S]
-
                     if mesh.dim == 2:
+
+                        row += [i]
+                        col += [i]
+                        data += [h_h * n_prod_S]
 
                         row += [se_index, sw_index]
                         col += [se_index, sw_index]

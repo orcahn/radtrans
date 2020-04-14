@@ -3,7 +3,6 @@ import timeit
 import configparser
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 import modelProblem
 import absorption
@@ -183,7 +182,8 @@ class RadiativeTransfer:
 
         x, iters, elapsed_time = linear_solver.solve(A, b, x_in)
 
-        self.visu = visualization.Visualization(dimension,method,x,self.mesh,n_ordinates,outputType)
+        self.visu = visualization.Visualization(
+            dimension, method, x, self.mesh, n_ordinates, outputType)
 
 
 if __name__ == "__main__":

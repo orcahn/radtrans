@@ -2,71 +2,50 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-class Visualization:
-    """
-    Given a computed solution and a mesh, this class produces visual output in
-    1 and 2 spatial dimensions.
-    """
+def visualize(sol, mesh, n_ord, outputType):
 
-    def __init__(self, dimension, method, solution, unif_mesh, n_ordinates,
-                 outputType):
+    if mesh.dim == 1:
 
-        self.dim = dimension
-        self.method = method
-        self.x = solution
-        self.mesh = unif_mesh
-        self.n_ord = n_ordinates
-        self.outputType = outputType
+        if outputType == "firstOrdinate":
 
-    def visualize(self):
+            plt.step(mesh.cell_centers_1d(),
+                     sol[:mesh.n_cells[0]], where='mid')
 
-        if self.dim == 1:
+        elif outputType == "meanIntensity":
 
-            if self.outputType == "firstOrdinate":
+            plt.step(mesh.cell_centers_1d(), np.mean(
+                (sol[-mesh.n_cells[0]:],
+                    sol[:mesh.n_cells[0]]),
+                axis=0), where='mid')
 
-                plt.step(self.mesh.cell_centers(),
-                         self.x[:self.mesh.n_cells[0]], where='mid')
+        elif outputType == "diffusion":
 
-            elif self.outputType == "meanIntensity":
+            plt.step(mesh.cell_centers_1d(), sol)
 
-                plt.step(self.mesh.cell_centers(), np.mean(
-                    (self.x[-self.mesh.n_cells[0]:],
-                        self.x[:self.mesh.n_cells[0]]),
-                    axis=0), where='mid')
+        else:
 
-            elif self.outputType == "diffusion":
+            raise Exception('Unknown output type: ' + outputType)
 
-                plt.step(self.mesh.cell_centers(), self.x)
+    else:   # mesh.dim == 2
 
-            else:
+        if outputType == "firstOrdinate":
 
-                raise Exception('Unknown output type: ' + self.outputType)
+            z = np.flipud(sol[:mesh.n_tot].reshape(
+                (mesh.n_cells[0], mesh.n_cells[1]), order='C'))
 
-        else:   # self.dim == 2
+        elif outputType == "meanIntensity":
 
-            if self.outputType == "firstOrdinate":
+            z = np.mean(sol.reshape((mesh.n_tot, n_ord), order='C'), axis=1
+                        ).reshape((mesh.n_cells[0], mesh.n_cells[1]),
+                                  order='C')
 
-                X, Y = self.mesh.centers
-                Z = self.x[:self.mesh.n_cells[0]*self.mesh.n_cells[1]
-                           ].reshape((self.mesh.n_cells[0], self.mesh.n_cells[1]))
+        elif outputType == "diffusion":
 
-            elif self.outputType == "meanIntensity":
+            z = sol.reshape(
+                (mesh.n_cells[0], mesh.n_cells[1]))
 
-                X, Y = self.mesh.centers
-                Z = np.mean(np.array_split(self.x, self.n_ord), axis=0).reshape(
-                    (self.mesh.n_cells[0], self.mesh.n_cells[1]))
+        plt.figure(1)
+        plt.pcolormesh(mesh.grid[0][:, 0], mesh.grid[1][0, :], z)
+        plt.colorbar()
 
-            elif self.outputType == "diffusion":
-
-                X, Y = self.mesh.centers
-                Z = self.x.reshape(
-                    (self.mesh.n_cells[0], self.mesh.n_cells[1]))
-
-            plt.figure(1)
-            plt.contourf(X, Y, Z)
-            plt.colorbar()
-            plt.figure(2)
-            plt.plot(np.arange(
-                0.5 * self.mesh.h[0], self.mesh.n_cells[0] * self.mesh.h[0], self.mesh.h[0]), Z[:, 0])
-
-        plt.show()
+    plt.show()

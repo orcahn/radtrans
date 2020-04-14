@@ -117,14 +117,6 @@ class UniformMesh:
             self.h = tuple(
                 map(lambda a, b: a / float(b), self.dom_len, self.n_cells))
 
-            # cell centers as a meshgrid
-            x_centers = np.arange(
-                0.5 * self.h[0], self.n_cells[0] * self.h[0], self.h[0])
-            y_centers = np.arange(
-                0.5 * self.h[1], self.n_cells[1] * self.h[1], self.h[1])
-            self.centers = np.meshgrid(x_centers, y_centers,
-            indexing='ij', copy=False)
-
         # compute total number of cells
         self.n_tot = 1
         for nc in self.n_cells:
@@ -210,7 +202,7 @@ class UniformMesh:
                          0.5 * (self.grid[1][0, j] +
                                 self.grid[1][0, j+1])]]
 
-        else:
+        else:   # quad_method == 'trapezoidal'
 
             weights = [2 * [0.5 * self.h[0], 0.5 * self.h[1]]]
 
@@ -287,9 +279,12 @@ class UniformMesh:
 
         if direction == Direction.E:
 
-            return np.arange(start=2 * self.n_cells[0] - 1,
-                             stop=self.n_tot - 1,
-                             step=self.n_cells[0])
+            if self.dim == 1:
+                return [self.n_cells[0] - 1]
+            else:
+                return np.arange(start=2 * self.n_cells[0] - 1,
+                                 stop=self.n_tot - 1,
+                                 step=self.n_cells[0])
 
         elif direction == Direction.N:
 
@@ -302,9 +297,12 @@ class UniformMesh:
 
         elif direction == Direction.W:
 
-            return np.arange(start=self.n_cells[0],
-                             stop=(self.n_cells[1] - 1) * self.n_cells[0],
-                             step=self.n_cells[0])
+            if self.dim == 1:
+                return [0]
+            else:
+                return np.arange(start=self.n_cells[0],
+                                 stop=(self.n_cells[1] - 1) * self.n_cells[0],
+                                 step=self.n_cells[0])
 
         elif direction == Direction.S:
 
@@ -316,7 +314,7 @@ class UniformMesh:
         else:
             raise Exception('Unknown direction ' + str(direction))
 
-    def cell_centers(self):
+    def cell_centers_1d(self):
         """
         Coordinates of the cell centers
 
@@ -327,8 +325,15 @@ class UniformMesh:
             indexing as for the corresponding cell indices.
         """
 
-        return np.arange(
-            0.5 * self.h[0], self.n_cells[0] * self.h[0], self.h[0])
+        if self.dim == 1:
+
+            h = self.dom_len[0] / self.n_cells[0]
+
+            return np.arange(0.5 * h, self.n_cells[0] * h, h)
+
+        else:
+
+            raise Exception('cell_centers_1d() only works for in 1 dimension')
 
     def south_west_corner(self):
 

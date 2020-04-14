@@ -44,13 +44,17 @@ class RadiativeTransfer:
         abs_type = config['MODEL']['absorptionType']
         absorption_coeff = absorption.Absorption(abs_type, domain)
 
+        self.n_ord = config.getint('DISCRETIZATION', 'n_ordinates')
         n_cells = tuple(
             map(int,
                 config['DISCRETIZATION']['n_cells'].strip().split(',')))
 
         # in one dimension there are only two possible discrete ordinates
-        n_ordinates = 2 if dimension == 1 else \
-            int(config['DISCRETIZATION']['n_ordinates'])
+        if dimension == 1 and self.n_ord != 2:
+
+            print('\nWarning: In one dimension two discrete ordinates' +
+                  '(+1.0, -1.0) will be used!')
+            self.n_ord = 2
 
         flux = str(config['DISCRETIZATION']['flux'])
 
@@ -59,11 +63,11 @@ class RadiativeTransfer:
         if config['BOUNDARY_VALUES']['type'] == 'uniform':
 
             boundary_values = tuple(config['BOUNDARY_VALUES']['value']
-                                    for m in range(n_ordinates))
+                                    for m in range(self.n_ord))
 
         elif config['BOUNDARY_VALUES']['type'] == 'inc_east':
 
-            boundary_values = (1.0, *[0.0 for m in range(n_ordinates - 1)])
+            boundary_values = (1.0, *[0.0 for m in range(self.n_ord - 1)])
 
         elif config['BOUNDARY_VALUES']['type'] == 'manual':
 
@@ -79,8 +83,8 @@ class RadiativeTransfer:
 
             sys.exit('Option \'manual\' was chosen for the boundary\n' +
                      'values. Provided number of boundary values (' +
-                     str(n_ordinates) + ')\ndid not match provided number' +
-                     'of discrete ordinates, which is ' + str(n_bndry_val) +
+                     str(n_bndry_val) + ')\ndid not match provided number' +
+                     'of discrete ordinates, which is ' + str(self.n_ord) +
                      '.')
 
         method = str(config['DISCRETIZATION']['method'])
@@ -97,7 +101,7 @@ class RadiativeTransfer:
         assert prec_type in ['none', 'lambdaIteration', 'diagonal'], \
             'Preconditioner ' + prec_type + ' currently not supported.'
 
-        outputType = str(config['OUTPUT']['type'])
+        self.outputType = str(config['OUTPUT']['type'])
 
         # define model problem and discretization
         model_problem = modelProblem.ModelProblem(
@@ -118,12 +122,12 @@ class RadiativeTransfer:
         if scattering == 'isotropic':
 
             disc = discretization.FiniteVolume1d(
-                model_problem, self.mesh, n_ordinates, boundary_values, flux)
+                model_problem, self.mesh, self.n_ord, boundary_values, flux)
 
         else:
 
             disc = discretization.FiniteVolume1d(
-                model_problem, self.mesh, n_ordinates, boundary_values, flux)
+                model_problem, self.mesh, self.n_ord, boundary_values, flux)
 
         elapsed_time = timeit.default_timer() - start_time
 
@@ -180,14 +184,16 @@ class RadiativeTransfer:
 
         linear_solver = solver.Solver(solver_name, prec)
 
-        x, iters, elapsed_time = linear_solver.solve(A, b, x_in)
+        self.x = linear_solver.solve(A, b, x_in)[0]
 
-        self.visu = visualization.Visualization(
-            dimension, method, x, self.mesh, n_ordinates, outputType)
+    def visualize(self):
+
+        visualization.visualize(
+            self.x, self.mesh, self.n_ord, self.outputType)
 
 
 if __name__ == "__main__":
 
     radtrans = RadiativeTransfer()
     radtrans.main(sys.argv)
-    radtrans.visu.visualize()
+    radtrans.visualize()

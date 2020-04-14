@@ -3,20 +3,28 @@ import timeit
 import numpy as np
 import scipy.sparse.linalg as spsla
 
+from scipy.sparse import identity
+
 
 def invert_transport(M, x, n_dof, n_ord):
 
-    nc = n_dof // n_ord
+    if isinstance(M, type(identity(n_dof))):
 
-    prec_vec = np.empty(n_dof)
+        return x
 
-    # invert the nc x nc diagonal blocks
-    for m in range(n_ord):
-        prec_vec[m * nc: (m + 1) * nc] = spsla.spsolve(
-            M[m * nc: (m + 1) * nc, m * nc: (m + 1) * nc],
-            x[m * nc: (m + 1) * nc])
+    else:
 
-    return prec_vec
+        nc = n_dof // n_ord
+
+        prec_vec = np.empty(n_dof)
+
+        # invert the nc x nc diagonal blocks
+        for m in range(n_ord):
+            prec_vec[m * nc: (m + 1) * nc] = spsla.spsolve(
+                M[m * nc: (m + 1) * nc, m * nc: (m + 1) * nc],
+                x[m * nc: (m + 1) * nc])
+
+        return prec_vec
 
 
 def invert_diagonal(M, x):

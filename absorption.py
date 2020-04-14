@@ -32,7 +32,7 @@ def gaussian_abs(x, L):
 
         res *= np.exp(-0.5 * (x[1] - 0.5 * L[1]) *
                       (x[1] - 0.5 * L[1])) / np.sqrt(2.0 * np.pi)
-    
+
     return res
 
 

@@ -89,6 +89,7 @@ class RadiativeTransfer:
                      '.')
 
         method = str(config['DISCRETIZATION']['method'])
+        quad_method = str(config['DISCRETIZATION']['quadrature'])
 
         solver_name = str(config['SOLVER']['solver'])
         assert solver_name in ['SparseDirect', 'GMRES', 'BiCGSTAB'], \
@@ -123,12 +124,14 @@ class RadiativeTransfer:
         if scattering == 'isotropic':
 
             disc = discretization.FiniteVolume1d(
-                model_problem, self.mesh, self.n_ord, boundary_values, flux)
+                model_problem, self.mesh, self.n_ord, boundary_values, flux,
+                quad_method)
 
         else:
 
             disc = discretization.FiniteVolume1d(
-                model_problem, self.mesh, self.n_ord, boundary_values, flux)
+                model_problem, self.mesh, self.n_ord, boundary_values, flux,
+                quad_method)
 
         elapsed_time = timeit.default_timer() - start_time
 
@@ -183,7 +186,8 @@ class RadiativeTransfer:
                     ns_mp.scat = 'none'
 
                     ns_disc = discretization.FiniteVolume1d(
-                        ns_mp, self.mesh, self.n_ord, boundary_values, flux)
+                        ns_mp, self.mesh, self.n_ord, boundary_values, flux,
+                        quad_method, False)
 
                     # one step of lambda iteration
                     x_in = solver.invert_transport(ns_disc.stiff_mat,

@@ -1,5 +1,3 @@
-import timeit
-
 import numpy as np
 import scipy.sparse as sps
 
@@ -73,7 +71,7 @@ class FiniteVolume1d:
     """
 
     def __init__(self, mp, mesh, n_ordinates, inflow_bc,
-                 numerical_flux='upwind', quadrature='midpoint'):
+                 numerical_flux='upwind', quadrature='midpoint', output=True):
         """
         Parameters
         ----------
@@ -108,19 +106,18 @@ class FiniteVolume1d:
         assert quadrature in ['midpoint', 'trapezoidal'], \
             'Quadrature method ' + quadrature + ' not implemented.'
 
-        print('Discretization:\n' +
-              '---------------\n' +
-              '    - number of discrete ordinates: ' + str(n_ordinates) +
-              '\n    - number of degrees of freedom: ' + str(self.n_dof) +
-              '\n    - quadrature method: ' + quadrature + ' rule\n' +
-              '    - numerical flux: ' + numerical_flux +
-              '\n\n')
+        if output:
+            print('Discretization:\n' +
+                  '---------------\n' +
+                  '    - number of discrete ordinates: ' + str(n_ordinates) +
+                  '\n    - number of degrees of freedom: ' + str(self.n_dof) +
+                  '\n    - quadrature method: ' + quadrature + ' rule\n' +
+                  '    - numerical flux: ' + numerical_flux +
+                  '\n\n')
 
         # --------------------------------------------------------------------
         #               DISCRETE ORDINATES AND SCATTERING
         # --------------------------------------------------------------------
-
-        t0 = timeit.default_timer()
 
         # list of directions of the discrete ordinates
         if mesh.dim == 1:
@@ -158,31 +155,19 @@ class FiniteVolume1d:
             for j in range(self.n_ord):
                 sig[i, j] = do_weights[i] * scat_prob[j]
 
-        t1 = timeit.default_timer() - t0
-        print('scattering coefficients: ' + "% 10.3e" % (t1))
-
         # --------------------------------------------------------------------
         #                           MATRIX ASSEMBLY
         # --------------------------------------------------------------------
 
-        t0 = timeit.default_timer()
         alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun, quadrature),
                               reps=(1, self.n_ord))
-        t1 = timeit.default_timer() - t0
-        print('alpha: ' + "% 10.3e" % (t1))
 
-        # timing and assembly of the discretized transport term
-        t0 = timeit.default_timer()
+        # assembly of the discretized transport term
         t_mat = self.__assemble_transport__(
             mesh, n_dot_n, ord_dir, numerical_flux)
-        t1 = timeit.default_timer() - t0
-        print('transport: ' + "% 10.3e" % (t1))
 
-        # timing and assembly of the discretized absorption term
-        t0 = timeit.default_timer()
+        # assembly of the discretized absorption term
         a_mat = self.__assemble_absorption__(alpha_tiled, mp.xip1)
-        t1 = timeit.default_timer() - t0
-        print('absorption: ' + "% 10.3e" % (t1))
 
         if mp.scat == 'none':
 
@@ -199,14 +184,10 @@ class FiniteVolume1d:
 
         else:
 
-            # timing and assembly of the discretized scattering terms
-            t0 = timeit.default_timer()
+            # assembly of the discretized scattering terms
             s_mat = self.__assemble_scattering__(
                 alpha_tiled[:, :mesh.n_tot], sig, mp.xi)
-            t1 = timeit.default_timer() - t0
-            print('scattering: ' + "% 10.3e" % (t1))
 
-            t0 = timeit.default_timer()
             # Combine transport and absorption parts. By default
             # when converting to CSR or CSC format, duplicate
             # (i,j) entries will be summed together
@@ -215,10 +196,7 @@ class FiniteVolume1d:
                 (np.concatenate((t_mat.row, a_mat.row)),
                  np.concatenate((t_mat.col, a_mat.col)))),
                 shape=(self.n_dof, self.n_dof))
-            t1 = timeit.default_timer() - t0
-            print('preconditioner: ' + "% 10.3e" % (t1))
 
-            t0 = timeit.default_timer()
             self.stiff_mat = sps.coo_matrix((
                 np.concatenate((self.lambda_prec.data, s_mat.data)),
                 (np.concatenate((self.lambda_prec.row, s_mat.row)),
@@ -226,16 +204,12 @@ class FiniteVolume1d:
                 shape=(self.n_dof, self.n_dof)).tocsr()
 
             self.lambda_prec = self.lambda_prec.tocsr()
-            t1 = timeit.default_timer() - t0
-            print('stiffness matrix: ' + "% 10.3e" % (t1))
 
         # --------------------------------------------------------------------
         #                       LOAD VECTOR ASSEMBLY
         # --------------------------------------------------------------------
 
-        t0 = timeit.default_timer()
-        # self.load_vec = mp.emiss * mp.s_e * np.ravel(alpha_tiled)
-        self.load_vec = np.zeros(alpha_tiled.size)
+        self.load_vec = mp.emiss * mp.s_e * np.ravel(alpha_tiled)
 
         # add boundary conditions
         for m in range(n_ordinates):
@@ -283,9 +257,6 @@ class FiniteVolume1d:
                 self.load_vec[[offset + mesh.south_west_corner(),
                                offset + mesh.south_east_corner()]] -= \
                     mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
-
-        t1 = timeit.default_timer() - t0
-        print('load vector: ' + "% 10.3e" % (t1) + '\n')
 
     def compute_scalar_product(self, outer_normals, ord_dir):
 

@@ -162,16 +162,34 @@ class RadiativeTransfer:
 
             elif initial_guess == "noScattering":
 
-                sol1 = disc.inflow_bc[0] * \
-                    np.exp(-self.mesh.cell_centers()) + model_problem.s_e * \
-                    (1 - np.exp(-self.mesh.cell_centers()))
+                if self.mesh.dim == 1:
 
-                sol2 = disc.inflow_bc[1] * \
-                    np.exp(-self.mesh.cell_centers()[::-1]) + \
-                    model_problem.s_e * \
-                    (1 - np.exp(-self.mesh.cell_centers()[::-1]))
+                    sol1 = disc.inflow_bc[0] * \
+                        np.exp(-self.mesh.cell_centers()) + \
+                        model_problem.s_e * \
+                        (1 - np.exp(-self.mesh.cell_centers()))
 
-                x_in = np.concatenate((sol1, sol2), axis=0)
+                    sol2 = disc.inflow_bc[1] * \
+                        np.exp(-self.mesh.cell_centers()[::-1]) + \
+                        model_problem.s_e * \
+                        (1 - np.exp(-self.mesh.cell_centers()[::-1]))
+
+                    x_in = np.concatenate((sol1, sol2), axis=0)
+
+                else:
+
+                    # create model problem without scattering
+                    ns_mp = model_problem
+                    ns_mp.scat = 'none'
+
+                    ns_disc = discretization.FiniteVolume1d(
+                        ns_mp, self.mesh, self.n_ord, boundary_values, flux)
+
+                    # one step of lambda iteration
+                    x_in = solver.invert_transport(ns_disc.stiff_mat,
+                                                   ns_disc.load_vec,
+                                                   ns_disc.n_dof,
+                                                   self.n_ord)
 
             else:
 

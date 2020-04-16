@@ -30,22 +30,22 @@ def visualize(sol, mesh, n_ord, outputType):
 
         if outputType == "firstOrdinate":
 
-            z = np.flipud(sol[:mesh.n_tot].reshape(
-                (mesh.n_cells[0], mesh.n_cells[1]), order='C'))
+            z = sol[:mesh.n_tot].reshape(
+                mesh.n_cells[1], mesh.n_cells[0], order='C')
 
         elif outputType == "meanIntensity":
 
-            z = np.mean(sol.reshape((mesh.n_tot, n_ord), order='C'), axis=1
-                        ).reshape((mesh.n_cells[0], mesh.n_cells[1]),
-                                  order='C')
+            np.set_printoptions(precision=3)
+            z = sol.reshape((n_ord, mesh.n_tot), order='C')
+            print(z)
+            z = np.mean(z, axis=0).reshape((mesh.n_cells[1], mesh.n_cells[0]))
 
         elif outputType == "diffusion":
 
-            z = sol.reshape(
-                (mesh.n_cells[0], mesh.n_cells[1]))
+            z = sol.reshape((mesh.n_cells[1], mesh.n_cells[0]), order='C')
 
         plt.figure(1)
-        plt.pcolormesh(mesh.grid[0][:, 0], mesh.grid[1][0, :], z)
+        plt.pcolormesh(mesh.grid[0], mesh.grid[1], z)
         plt.colorbar()
 
     plt.show()

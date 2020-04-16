@@ -128,7 +128,7 @@ class UniformMesh:
             *[np.linspace(0.0, self.dom_len[n],
                           num=self.n_cells[n] + 1, endpoint=True)
               for n in range(dimension)],
-            indexing='ij', sparse=True, copy=False)
+            indexing='xy', sparse=True, copy=False)
 
         print('Mesh:\n' +
               '-----\n' +
@@ -197,10 +197,10 @@ class UniformMesh:
                 i = cell % self.n_cells[0]
                 j = (cell - i) // self.n_cells[0]
 
-                return [[0.5 * (self.grid[0][i, 0] +
-                                self.grid[0][i+1, 0]),
-                         0.5 * (self.grid[1][0, j] +
-                                self.grid[1][0, j+1])]]
+                return [[0.5 * (self.grid[0][0, i] +
+                                self.grid[0][0, i+1]),
+                         0.5 * (self.grid[1][j, 0] +
+                                self.grid[1][j+1, 0])]]
 
         else:   # quad_method == 'trapezoidal'
 
@@ -212,10 +212,10 @@ class UniformMesh:
                 i = cell % self.n_cells[0]
                 j = (cell - i) // self.n_cells[0]
 
-                return [[self.grid[0][i, 0],
-                         self.grid[1][0, j]],
-                        [self.grid[0][i+1, 0],
-                         self.grid[1][0, j+1]]]
+                return [[self.grid[0][0, i],
+                         self.grid[1][j, 0]],
+                        [self.grid[0][0, i+1],
+                         self.grid[1][j+1, 0]]]
 
         def q_fun(cell): return quadrature(abs_fun, weights, nodes(cell))
 
@@ -227,30 +227,6 @@ class UniformMesh:
             return self.__integrate_cellwise_1d__(abs_fun, quad_method)
         else:
             return self.__integrate_cellwise_2d__(abs_fun, quad_method)
-
-    def outflow_boundary(self, ord_dir):
-
-        boundaries = []
-
-        for d in self.outer_normal:
-
-            if np.dot(self.outer_normal[d], ord_dir) > 0.0:
-
-                boundaries += [d]
-
-        return boundaries
-
-    def inflow_boundary(self, ord_dir):
-
-        boundaries = []
-
-        for d in self.outer_normal:
-
-            if np.dot(self.outer_normal[d], ord_dir) < 0.0:
-
-                boundaries += [d]
-
-        return boundaries
 
     def interior_cells(self):
 

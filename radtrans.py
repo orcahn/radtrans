@@ -62,12 +62,13 @@ class RadiativeTransfer:
 
         if config['BOUNDARY_VALUES']['type'] == 'uniform':
 
-            boundary_values = tuple(config['BOUNDARY_VALUES']['value']
+            boundary_values = tuple(float(config['BOUNDARY_VALUES']['value'])
                                     for m in range(self.n_ord))
 
         elif config['BOUNDARY_VALUES']['type'] == 'inc_east':
 
-            boundary_values = (1.0, *[0.0 for m in range(self.n_ord - 1)])
+            boundary_values = (config.getfloat('BOUNDARY_VALUES', 'value'),
+                               *[0.0 for m in range(self.n_ord - 1)])
 
         elif config['BOUNDARY_VALUES']['type'] == 'manual':
 

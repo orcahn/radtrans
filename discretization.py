@@ -134,6 +134,8 @@ class FiniteVolume1d:
             ord_dir = [np.array([np.cos(m * piM), np.sin(m * piM)])
                        for m in np.arange(n_ordinates, dtype=np.single)]
 
+        n_dot_n = self.compute_scalar_product(mesh.outer_normal, ord_dir)
+
         # scattering coefficients for the chosen process
         sig = np.empty((self.n_ord, self.n_ord))
         do_weights = np.zeros(n_ordinates)
@@ -171,7 +173,8 @@ class FiniteVolume1d:
 
         # timing and assembly of the discretized transport term
         t0 = timeit.default_timer()
-        t_mat = self.__assemble_transport__(mesh, ord_dir, numerical_flux)
+        t_mat = self.__assemble_transport__(
+            mesh, n_dot_n, ord_dir, numerical_flux)
         t1 = timeit.default_timer() - t0
         print('transport: ' + "% 10.3e" % (t1))
 
@@ -196,7 +199,7 @@ class FiniteVolume1d:
 
         else:
 
-            # timing and assembly of the discretize scattering terms
+            # timing and assembly of the discretized scattering terms
             t0 = timeit.default_timer()
             s_mat = self.__assemble_scattering__(
                 alpha_tiled[:, :mesh.n_tot], sig, mp.xi)
@@ -208,7 +211,7 @@ class FiniteVolume1d:
             # when converting to CSR or CSC format, duplicate
             # (i,j) entries will be summed together
             self.lambda_prec = sps.coo_matrix((
-                np.concatenate((t_mat.data, mp.xip1 * a_mat.data)),
+                np.concatenate((t_mat.data, a_mat.data)),
                 (np.concatenate((t_mat.row, a_mat.row)),
                  np.concatenate((t_mat.col, a_mat.col)))),
                 shape=(self.n_dof, self.n_dof))
@@ -231,32 +234,83 @@ class FiniteVolume1d:
         # --------------------------------------------------------------------
 
         t0 = timeit.default_timer()
-        self.load_vec = mp.emiss * mp.s_e * np.ravel(alpha_tiled)
+        # self.load_vec = mp.emiss * mp.s_e * np.ravel(alpha_tiled)
+        self.load_vec = np.zeros(alpha_tiled.size)
 
         # add boundary conditions
         for m in range(n_ordinates):
 
-            in_bndry = mesh.inflow_boundary(ord_dir[m])
+            in_bndry = []
 
-            for d in [Dir.E, Dir.W]:
+            for d, n_list in n_dot_n.items():
+                if n_list[m] < 0.0:
+                    in_bndry += [d]
 
-                if d in in_bndry:
+            offset = m * mesh.n_tot
 
-                    self.load_vec[mesh.boundary_cells(d)] -= \
-                        mesh.h[1] * np.dot(ord_dir[m], mesh.outer_normal[d]) *\
-                        self.inflow_bc[m]
+            if Dir.E in in_bndry:
+                print(offset + mesh.boundary_cells(Dir.E))
+                self.load_vec[offset + mesh.boundary_cells(Dir.E)] -= \
+                    mesh.h[1] * n_dot_n[Dir.E][m] * self.inflow_bc[m]
 
-            for d in [Dir.N, Dir.S]:
+                self.load_vec[[offset + mesh.south_east_corner(),
+                               offset + mesh.north_east_corner()]] -= \
+                    mesh.h[1] * n_dot_n[Dir.E][m] * self.inflow_bc[m]
 
-                if d in in_bndry:
-                    self.load_vec[mesh.boundary_cells(d)] -= \
-                        mesh.h[0] * np.dot(ord_dir[m], mesh.outer_normal[d]) *\
-                        self.inflow_bc[m]
+            if Dir.W in in_bndry:
+
+                self.load_vec[offset + mesh.boundary_cells(Dir.W)] -= \
+                    mesh.h[1] * n_dot_n[Dir.W][m] * self.inflow_bc[m]
+
+                self.load_vec[[offset + mesh.south_west_corner(),
+                               offset + mesh.north_west_corner()]] -= \
+                    mesh.h[1] * n_dot_n[Dir.W][m] * self.inflow_bc[m]
+
+            if Dir.N in in_bndry:
+
+                self.load_vec[offset + mesh.boundary_cells(Dir.N)] -= \
+                    mesh.h[0] * n_dot_n[Dir.N][m] * self.inflow_bc[m]
+
+                self.load_vec[[offset + mesh.north_west_corner(),
+                               offset + mesh.north_east_corner()]] -= \
+                    mesh.h[0] * n_dot_n[Dir.N][m] * self.inflow_bc[m]
+
+            if Dir.S in in_bndry:
+
+                self.load_vec[offset + mesh.boundary_cells(Dir.S)] -= \
+                    mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
+
+                self.load_vec[[offset + mesh.south_west_corner(),
+                               offset + mesh.south_east_corner()]] -= \
+                    mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
 
         t1 = timeit.default_timer() - t0
         print('load vector: ' + "% 10.3e" % (t1) + '\n')
+        print(self.load_vec)
 
-    def __assemble_transport__(self, mesh, ord_dir, num_flux):
+    def compute_scalar_product(self, outer_normals, ord_dir):
+
+        # scalar products with the directions Dir.W and Dir.S can be computed
+        # from the ones for Dir.E and Dir.N by switching the sign
+        nn = {Dir.E: [], Dir.N: [], Dir.W: [], Dir.S: []}
+
+        for d, nn_list in nn.items():
+            for nm in ord_dir:
+
+                prod = np.dot(outer_normals[d], nm)
+
+                # even for 1e6 ordinate directions, the smallest absolute value
+                # of a scalar product between ordinate and normal is on the
+                # order 1e-6. Values smaller than 1e-12 are thus guaranteed to
+                # stem from errors in floating point calculations.
+                if np.abs(prod) < 1e-12:
+                    prod = 0.0
+
+                nn_list += [prod]
+
+        return nn
+
+    def __assemble_transport__(self, mesh, n_dot_n, ord_dir, num_flux):
 
         h_h = mesh.h[0]
         h_v = mesh.h[1]
@@ -285,11 +339,15 @@ class FiniteVolume1d:
 
         for m in range(self.n_ord):
 
-            out_bndry = mesh.outflow_boundary(ord_dir[m])
+            out_bndry = []
+
+            for d, n_list in n_dot_n.items():
+                if n_list[m] > 0.0:
+                    out_bndry += [d]
 
             # scalar product of outer normals with ordinate direction m
-            n_prod_E = np.dot(mesh.outer_normal[Dir.E], ord_dir[m])
-            n_prod_N = np.dot(mesh.outer_normal[Dir.N], ord_dir[m])
+            n_prod_E = n_dot_n[Dir.E][m]
+            n_prod_N = n_dot_n[Dir.N][m]
             n_prod_W = -n_prod_E
             n_prod_S = -n_prod_N
 
@@ -350,6 +408,30 @@ class FiniteVolume1d:
                          flux_plus(n_prod_E, h_v),
                          flux_minus(n_prod_N, h_h)]
 
+                if Dir.E in out_bndry:
+
+                    row += [se_index, ne_index]
+                    col += [se_index, ne_index]
+                    data += 2 * [h_v * n_prod_E]
+
+                elif Dir.W in out_bndry:
+
+                    row += [sw_index, nw_index]
+                    col += [sw_index, nw_index]
+                    data += 2 * [h_v * n_prod_W]
+
+                if Dir.N in out_bndry:
+
+                    row += [ne_index, nw_index]
+                    col += [ne_index, nw_index]
+                    data += 2 * [h_h * n_prod_N]
+
+                elif Dir.S in out_bndry:
+
+                    row += [se_index, sw_index]
+                    col += [se_index, sw_index]
+                    data += 2 * [h_h * n_prod_S]
+
             # the boundary cells excluding cells in the corners
             for i in mesh.boundary_cells(Dir.E):
 
@@ -375,10 +457,6 @@ class FiniteVolume1d:
                         col += [i]
                         data += [h_v * n_prod_E]
 
-                        row += [se_index, ne_index]
-                        col += [se_index, ne_index]
-                        data += 2 * [h_v * n_prod_E]
-
             for i in mesh.boundary_cells(Dir.N):
 
                 row += 4 * [i]
@@ -396,10 +474,6 @@ class FiniteVolume1d:
                         row += [i]
                         col += [i]
                         data += [h_h * n_prod_N]
-
-                        row += [ne_index, nw_index]
-                        col += [ne_index, nw_index]
-                        data += 2 * [h_h * n_prod_N]
 
             for i in mesh.boundary_cells(Dir.W):
 
@@ -425,10 +499,6 @@ class FiniteVolume1d:
                         col += [i]
                         data += [h_v * n_prod_W]
 
-                        row += [sw_index, nw_index]
-                        col += [sw_index, nw_index]
-                        data += 2 * [h_v * n_prod_W]
-
             for i in mesh.boundary_cells(Dir.S):
 
                 row += 4 * [i]
@@ -446,21 +516,6 @@ class FiniteVolume1d:
                         row += [i]
                         col += [i]
                         data += [h_h * n_prod_S]
-
-                        row += [se_index, sw_index]
-                        col += [se_index, sw_index]
-                        data += 2 * [h_h * n_prod_S]
-
-            # remove the zero entries from the matrix
-            row = np.array(row)
-            col = np.array(col)
-            data = np.array(data)
-
-            zeros = np.where(np.abs(data) < 1e-12 * min(mesh.h))[0]
-
-            row = np.delete(row, zeros)
-            col = np.delete(col, zeros)
-            data = np.delete(data, zeros)
 
             block_diag += [sps.coo_matrix((data, (row, col)),
                                           shape=(mesh.n_tot, mesh.n_tot))]

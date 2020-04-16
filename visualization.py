@@ -35,9 +35,13 @@ def visualize(sol, mesh, n_ord, outputType):
 
         elif outputType == "meanIntensity":
 
-            np.set_printoptions(precision=3)
             z = sol.reshape((n_ord, mesh.n_tot), order='C')
             z = np.mean(z, axis=0).reshape((mesh.n_cells[1], mesh.n_cells[0]))
+
+        elif outputType == "totalIntensity":
+
+            z = sol.reshape((n_ord, mesh.n_tot), order='C')
+            z = np.sum(z, axis=0).reshape((mesh.n_cells[1], mesh.n_cells[0]))
 
         elif outputType == "diffusion":
 

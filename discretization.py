@@ -249,7 +249,7 @@ class FiniteVolume1d:
             offset = m * mesh.n_tot
 
             if Dir.E in in_bndry:
-                print(offset + mesh.boundary_cells(Dir.E))
+
                 self.load_vec[offset + mesh.boundary_cells(Dir.E)] -= \
                     mesh.h[1] * n_dot_n[Dir.E][m] * self.inflow_bc[m]
 
@@ -286,7 +286,6 @@ class FiniteVolume1d:
 
         t1 = timeit.default_timer() - t0
         print('load vector: ' + "% 10.3e" % (t1) + '\n')
-        print(self.load_vec)
 
     def compute_scalar_product(self, outer_normals, ord_dir):
 

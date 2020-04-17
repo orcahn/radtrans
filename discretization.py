@@ -73,7 +73,7 @@ class FiniteVolume:
     lambda_prec : scipy.sparse.csr.csr_matrix
         Explicit sparse representation of the linear preconditioner used in
         the lambda iteration.
-    load_vec : np.ndarray
+    load_vec : numpy.ndarray
         Load vector of the system.
 
     Methods
@@ -90,6 +90,8 @@ class FiniteVolume:
     __assemble_scattering__(alpha, sig, xi)
         Assembles the part of the stiffness matrix corresponding to the
         scattering term.
+    __assemble_source__(mp, mesh, alpha_tiled, n_dot_n)
+        Assembles the load vector corresponding to the source terms.
 
     Implementation Notes
     --------------------
@@ -235,54 +237,8 @@ class FiniteVolume:
 
             self.lambda_prec = self.lambda_prec.tocsr()
 
-        self.load_vec = mp.emiss * mp.s_e * np.ravel(alpha_tiled)
-
-        # add boundary conditions
-        for m in range(n_ordinates):
-
-            in_bndry = []
-
-            for d, n_list in n_dot_n.items():
-                if n_list[m] < 0.0:
-                    in_bndry += [d]
-
-            offset = m * mesh.n_tot
-
-            if Dir.E in in_bndry:
-
-                self.load_vec[offset + mesh.boundary_cells(Dir.E)] -= \
-                    mesh.h[1] * n_dot_n[Dir.E][m] * self.inflow_bc[m]
-
-                self.load_vec[[offset + mesh.south_east_corner(),
-                               offset + mesh.north_east_corner()]] -= \
-                    mesh.h[1] * n_dot_n[Dir.E][m] * self.inflow_bc[m]
-
-            if Dir.W in in_bndry:
-
-                self.load_vec[offset + mesh.boundary_cells(Dir.W)] -= \
-                    mesh.h[1] * n_dot_n[Dir.W][m] * self.inflow_bc[m]
-
-                self.load_vec[[offset + mesh.south_west_corner(),
-                               offset + mesh.north_west_corner()]] -= \
-                    mesh.h[1] * n_dot_n[Dir.W][m] * self.inflow_bc[m]
-
-            if Dir.N in in_bndry:
-
-                self.load_vec[offset + mesh.boundary_cells(Dir.N)] -= \
-                    mesh.h[0] * n_dot_n[Dir.N][m] * self.inflow_bc[m]
-
-                self.load_vec[[offset + mesh.north_west_corner(),
-                               offset + mesh.north_east_corner()]] -= \
-                    mesh.h[0] * n_dot_n[Dir.N][m] * self.inflow_bc[m]
-
-            if Dir.S in in_bndry:
-
-                self.load_vec[offset + mesh.boundary_cells(Dir.S)] -= \
-                    mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
-
-                self.load_vec[[offset + mesh.south_west_corner(),
-                               offset + mesh.south_east_corner()]] -= \
-                    mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
+        self.load_vec = self.__assemble_source__(
+            mp, mesh, alpha_tiled, n_dot_n)
 
     def __compute_scalar_product__(self, outer_normals, ord_dir):
         """
@@ -292,9 +248,9 @@ class FiniteVolume:
 
         Parameters
         ----------
-        outer_normals : <mesh.Direction : np.ndarray> dictionary
+        outer_normals : <mesh.Direction : numpy.ndarray> dictionary
             The four outer normals of the rectangular domain
-        ord_dir : list of np.ndarray
+        ord_dir : list of numpy.ndarray
             List of all the discrete ordinate directions
 
         Returns
@@ -335,7 +291,7 @@ class FiniteVolume:
         n_dot_n : <mesh.Direction : list of floats> dictionary
             Dictionary containing all the relevant scala products, as returned
             by __compute_scalar_products__.
-        ord_dir : list of np.ndarray
+        ord_dir : list of numpy.ndarray
             List of all the discrete ordinate directions.
         num_flux : string
             Numerical flux function to be used in discretization
@@ -565,7 +521,7 @@ class FiniteVolume:
 
         Parameters
         ----------
-        alpha_tiled : one dimensional np.ndarray
+        alpha_tiled : one dimensional numpy.ndarray
             The integrals of the absorption coefficient over the cells of the
             mesh, repeated n_ordinate times.
         xip1 : float
@@ -594,7 +550,7 @@ class FiniteVolume:
 
         Parameters
         ----------
-        alpha : one dimensional np.ndarray
+        alpha : one dimensional numpy.ndarray
             The integrals of the absorption coefficient over the cells of the
             mesh.
         xip1 : float
@@ -626,3 +582,75 @@ class FiniteVolume:
             blocks += [block_row]
 
         return sps.bmat(blocks, format='coo')
+
+    def __assemble_source__(self, mp, mesh, alpha_tiled, n_dot_n):
+        """
+        Assembles the load vector corresponding to the source terms.
+
+        Parameters
+        ----------
+        mp : modelProblem.ModelProblem
+            Radiative Transfer problem to be discretized
+        mesh : mesh.UniformMesh
+            Uniform mesh used for the FV discretization.
+        alpha_tiled : one dimensional numpy.ndarray
+            The integrals of the absorption coefficient over the cells of the
+            mesh, repeated n_ordinate times.
+        n_dot_n : <mesh.Direction : list of floats> dictionary
+            Dictionary containing all the relevant scala products, as returned
+            by __compute_scalar_products__.
+
+        Returns
+        -------
+        numpy.ndarray
+            Load vector of the system
+        """
+
+        load_vec = mp.emiss * mp.s_e * np.ravel(alpha_tiled)
+
+        # add boundary conditions
+        for m in range(self.n_ord):
+
+            in_bndry = []
+
+            for d, n_list in n_dot_n.items():
+                if n_list[m] < 0.0:
+                    in_bndry += [d]
+
+            offset = m * mesh.n_tot
+
+            if Dir.E in in_bndry:
+
+                load_vec[offset + mesh.boundary_cells(Dir.E)] -= \
+                    mesh.h[1] * n_dot_n[Dir.E][m] * self.inflow_bc[m]
+
+                load_vec[[offset + mesh.south_east_corner(),
+                          offset + mesh.north_east_corner()]] -= \
+                    mesh.h[1] * n_dot_n[Dir.E][m] * self.inflow_bc[m]
+
+            if Dir.W in in_bndry:
+
+                load_vec[offset + mesh.boundary_cells(Dir.W)] -= \
+                    mesh.h[1] * n_dot_n[Dir.W][m] * self.inflow_bc[m]
+
+                load_vec[[offset + mesh.south_west_corner(),
+                          offset + mesh.north_west_corner()]] -= \
+                    mesh.h[1] * n_dot_n[Dir.W][m] * self.inflow_bc[m]
+
+            if Dir.N in in_bndry:
+
+                load_vec[offset + mesh.boundary_cells(Dir.N)] -= \
+                    mesh.h[0] * n_dot_n[Dir.N][m] * self.inflow_bc[m]
+
+                load_vec[[offset + mesh.north_west_corner(),
+                          offset + mesh.north_east_corner()]] -= \
+                    mesh.h[0] * n_dot_n[Dir.N][m] * self.inflow_bc[m]
+
+            if Dir.S in in_bndry:
+
+                load_vec[offset + mesh.boundary_cells(Dir.S)] -= \
+                    mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
+
+                load_vec[[offset + mesh.south_west_corner(),
+                          offset + mesh.south_east_corner()]] -= \
+                    mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]

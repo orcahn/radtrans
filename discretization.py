@@ -618,41 +618,49 @@ class FiniteVolume:
                     in_bndry += [d]
 
             offset = m * mesh.n_tot
+        
+            if mesh.dim == 1:
 
-            if Dir.E in in_bndry:
+                for d in in_bndry:
+                    load_vec[offset + mesh.boundary_cells(d)] -= \
+                    mesh.h[1] * n_dot_n[d][m] * self.inflow_bc[m]
+            
+            else:
 
-                load_vec[offset + mesh.boundary_cells(Dir.E)] -= \
-                    mesh.h[1] * n_dot_n[Dir.E][m] * self.inflow_bc[m]
+                if Dir.E in in_bndry:
 
-                load_vec[[offset + mesh.south_east_corner(),
-                          offset + mesh.north_east_corner()]] -= \
-                    mesh.h[1] * n_dot_n[Dir.E][m] * self.inflow_bc[m]
+                    load_vec[offset + mesh.boundary_cells(Dir.E)] -= \
+                        mesh.h[1] * n_dot_n[Dir.E][m] * self.inflow_bc[m]
 
-            if Dir.W in in_bndry:
+                    load_vec[[offset + mesh.south_east_corner(),
+                            offset + mesh.north_east_corner()]] -= \
+                        mesh.h[1] * n_dot_n[Dir.E][m] * self.inflow_bc[m]
 
-                load_vec[offset + mesh.boundary_cells(Dir.W)] -= \
-                    mesh.h[1] * n_dot_n[Dir.W][m] * self.inflow_bc[m]
+                if Dir.W in in_bndry:
 
-                load_vec[[offset + mesh.south_west_corner(),
-                          offset + mesh.north_west_corner()]] -= \
-                    mesh.h[1] * n_dot_n[Dir.W][m] * self.inflow_bc[m]
+                    load_vec[offset + mesh.boundary_cells(Dir.W)] -= \
+                        mesh.h[1] * n_dot_n[Dir.W][m] * self.inflow_bc[m]
 
-            if Dir.N in in_bndry:
+                    load_vec[[offset + mesh.south_west_corner(),
+                            offset + mesh.north_west_corner()]] -= \
+                        mesh.h[1] * n_dot_n[Dir.W][m] * self.inflow_bc[m]
 
-                load_vec[offset + mesh.boundary_cells(Dir.N)] -= \
-                    mesh.h[0] * n_dot_n[Dir.N][m] * self.inflow_bc[m]
+                if Dir.N in in_bndry:
 
-                load_vec[[offset + mesh.north_west_corner(),
-                          offset + mesh.north_east_corner()]] -= \
-                    mesh.h[0] * n_dot_n[Dir.N][m] * self.inflow_bc[m]
+                    load_vec[offset + mesh.boundary_cells(Dir.N)] -= \
+                        mesh.h[0] * n_dot_n[Dir.N][m] * self.inflow_bc[m]
 
-            if Dir.S in in_bndry:
+                    load_vec[[offset + mesh.north_west_corner(),
+                            offset + mesh.north_east_corner()]] -= \
+                        mesh.h[0] * n_dot_n[Dir.N][m] * self.inflow_bc[m]
 
-                load_vec[offset + mesh.boundary_cells(Dir.S)] -= \
-                    mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
+                if Dir.S in in_bndry:
 
-                load_vec[[offset + mesh.south_west_corner(),
-                          offset + mesh.south_east_corner()]] -= \
-                    mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
+                    load_vec[offset + mesh.boundary_cells(Dir.S)] -= \
+                        mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
+
+                    load_vec[[offset + mesh.south_west_corner(),
+                            offset + mesh.south_east_corner()]] -= \
+                        mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
 
         return load_vec

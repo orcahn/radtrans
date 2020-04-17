@@ -123,13 +123,13 @@ class RadiativeTransfer:
 
         if scattering == 'isotropic':
 
-            disc = discretization.FiniteVolume1d(
+            disc = discretization.FiniteVolume(
                 model_problem, self.mesh, self.n_ord, boundary_values, flux,
                 quad_method)
 
         else:
 
-            disc = discretization.FiniteVolume1d(
+            disc = discretization.FiniteVolume(
                 model_problem, self.mesh, self.n_ord, boundary_values, flux,
                 quad_method)
 
@@ -185,7 +185,7 @@ class RadiativeTransfer:
                     ns_mp = model_problem
                     ns_mp.scat = 'none'
 
-                    ns_disc = discretization.FiniteVolume1d(
+                    ns_disc = discretization.FiniteVolume(
                         ns_mp, self.mesh, self.n_ord, boundary_values, flux,
                         quad_method, False)
 

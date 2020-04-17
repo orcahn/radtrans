@@ -256,7 +256,7 @@ class UniformMesh:
         if direction == Direction.E:
 
             if self.dim == 1:
-                return [self.n_cells[0] - 1]
+                return np.array([self.n_cells[0] - 1])
             else:
                 return np.arange(start=2 * self.n_cells[0] - 1,
                                  stop=self.n_tot - 1,
@@ -265,7 +265,7 @@ class UniformMesh:
         elif direction == Direction.N:
 
             if self.dim == 1:
-                return []
+                return np.array([])
             else:
                 return np.arange(
                     start=(self.n_cells[1] - 1) * self.n_cells[0] + 1,
@@ -274,7 +274,7 @@ class UniformMesh:
         elif direction == Direction.W:
 
             if self.dim == 1:
-                return [0]
+                return np.array([0])
             else:
                 return np.arange(start=self.n_cells[0],
                                  stop=(self.n_cells[1] - 1) * self.n_cells[0],
@@ -283,7 +283,7 @@ class UniformMesh:
         elif direction == Direction.S:
 
             if self.dim == 1:
-                return []
+                return np.array([])
             else:
                 return np.arange(start=1, stop=self.n_cells[0] - 1)
 

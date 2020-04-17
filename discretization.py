@@ -654,3 +654,5 @@ class FiniteVolume:
                 load_vec[[offset + mesh.south_west_corner(),
                           offset + mesh.south_east_corner()]] -= \
                     mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
+
+        return load_vec

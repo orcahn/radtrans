@@ -46,6 +46,7 @@ def step_abs(x, L):
         return 0.0
 
 
+# TODO: make it work in 2 dimensions
 # piecewise constant absorption with random values
 # following a gaussian distribution
 def gaussian_random_piecewise(x, constants):
@@ -74,13 +75,9 @@ class Absorption:
         ---------
         abs_fun_type : string
             Type of absorption coefficient as parsed from the .ini file
-        domain_length : float
-            Right boundary L of the domain (0, L)
+        domain_length : tuple of floats
+            Domain lengths in the corresponding dimensions of the problem
         """
-
-        assert abs_fun_type in ['none', 'const', 'posGrad', 'gaussian',
-                                'step', 'gaussianRandomPiecewise'], \
-            'Absorption type ' + abs_fun_type + ' currently not supported.'
 
         self.abs_fun = None
 
@@ -104,14 +101,19 @@ class Absorption:
 
             self.abs_fun = lambda x: step_abs(x, domain_length)
 
-        elif abs_fun_type == 'gaussianRandomPiecewise':
+        else:
 
-            num_intervals = int(domain_length * 2)
+            raise Exception('Absorption type ' + abs_fun_type +
+                            ' currently not supported.')
 
-            # Samples from a Gaussian distribution with mean 0.5
-            # and standard deviation 0.15
-            constants = np.array(
-                [0.15 * np.random.randn() + 0.5
-                 for i in range(num_intervals)]).clip(min=0, max=1)
+        # elif abs_fun_type == 'gaussianRandomPiecewise':
 
-            self.abs_fun = lambda x: gaussian_random_piecewise(x, constants)
+        #     num_intervals = int(domain_length * 2)
+
+        #     # Samples from a Gaussian distribution with mean 0.5
+        #     # and standard deviation 0.15
+        #     constants = np.array(
+        #         [0.15 * np.random.randn() + 0.5
+        #          for i in range(num_intervals)]).clip(min=0, max=1)
+
+        #     self.abs_fun = lambda x: gaussian_random_piecewise(x, constants)

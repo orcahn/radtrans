@@ -3,6 +3,16 @@ import scipy.sparse as sps
 
 from mesh import Direction as Dir
 
+# -----------------------------------------------------------------------------
+#                           NUMERICAL FLUXES
+# -----------------------------------------------------------------------------
+
+# The possible numerical fluxes used in the discretization of the transport
+# term. When computing entry T_{ij} we need the value of the numerical flux
+# function on the cell in negative direction of the face-normal we consider
+# (""_flux_minus), as well as the values on the same cell (""_flux_null) and
+# the cell in positive normal direction (""_flux_plus)
+
 
 def upwind_flux_minus(scalar_prod, h):
 
@@ -42,6 +52,10 @@ def centered_flux_plus(scalar_prod, h):
 
     return 0.5 * h * scalar_prod
 
+
+# -----------------------------------------------------------------------------
+#                       FINITE VOLUME DISCRETIZATION
+# -----------------------------------------------------------------------------
 
 class FiniteVolume1d:
     """
@@ -115,9 +129,9 @@ class FiniteVolume1d:
                   '    - numerical flux: ' + numerical_flux +
                   '\n\n')
 
-        # --------------------------------------------------------------------
+        # ---------------------------------------------------------------------
         #               DISCRETE ORDINATES AND SCATTERING
-        # --------------------------------------------------------------------
+        # ---------------------------------------------------------------------
 
         # list of directions of the discrete ordinates
         if mesh.dim == 1:

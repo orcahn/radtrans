@@ -11,7 +11,7 @@ from mesh import Direction as Dir
 # term. When computing entry T_{ij} we need the value of the numerical flux
 # function on the cell in negative direction of the face-normal we consider
 # (""_flux_minus), as well as the values on the same cell (""_flux_null) and
-# the cell in positive normal direction (""_flux_plus)
+# the cell in positive normal direction (""_flux_plus).
 
 
 def upwind_flux_minus(scalar_prod, h):
@@ -57,10 +57,10 @@ def centered_flux_plus(scalar_prod, h):
 #                       FINITE VOLUME DISCRETIZATION
 # -----------------------------------------------------------------------------
 
-class FiniteVolume1d:
+class FiniteVolume:
     """
-    This class represents a one-dimensional finite-volume discretization of
-    the continuous model equations.
+    This class represents a finite-volume discretization of the continuous
+    model equations in one or two dimensions.
 
     Attributes
     ------
@@ -74,8 +74,22 @@ class FiniteVolume1d:
         Explicit sparse representation of the linear preconditioner used in
         the lambda iteration.
     load_vec : np.ndarray
-        Dense load vector of the system.
+        Load vector of the system.
 
+    Methods
+    -------
+    __compute_scalar_product__(outer_normals, ord_dir)
+        Computes the scalar product between all discrete ordinates directions
+        and the outer normals of the domain.
+    __assemble_transport__(mesh, n_dot_n, ord_dir, num_flux)
+        Assembles the part of the stiffness matrix corresponding to the
+        transport term.
+    __assemble_absorption__(alpha_tiled, xip1)
+        Assembles the part of the stiffness matrix corresponding to the
+        absorption term.
+    __assemble_scattering__(alpha, sig, xi)
+        Assembles the part of the stiffness matrix corresponding to the
+        scattering term.
 
     Implementation Notes
     --------------------
@@ -89,20 +103,22 @@ class FiniteVolume1d:
         """
         Parameters
         ----------
-        mp : modelProblem.ModelProblem1d
+        mp : modelProblem.ModelProblem
             Radiative Transfer problem to be discretized
         mesh : mesh.UniformMesh
             Uniform mesh used for the FV discretization.
         n_ordinates : integer
             Number of discrete ordinates. The directions are chosen equidistant
             on the unit circle.
-        do_weights : tuple of length 2
-            Weights for the quadrature of the discrete ordinates
+        inflow_bc : list of floats
+            The inflow boundary conditions for each discrete ordinate
         numerical_flux : string
-            Numerical flux function used in the discretization of the
+            Numerical flux function to be used in the discretization of the
             transport term.
         quadrature : string
             Quadrature method to be used in computation of matrix entries
+        output : bool
+            Whether to print the relevant quantities of the discretization
         """
 
         self.n_ord = n_ordinates
@@ -145,7 +161,7 @@ class FiniteVolume1d:
             ord_dir = [np.array([np.cos(m * piM), np.sin(m * piM)])
                        for m in np.arange(n_ordinates, dtype=np.single)]
 
-        n_dot_n = self.compute_scalar_product(mesh.outer_normal, ord_dir)
+        n_dot_n = self.__compute_scalar_product__(mesh.outer_normal, ord_dir)
 
         # scattering coefficients for the chosen process
         sig = np.empty((self.n_ord, self.n_ord))
@@ -170,7 +186,7 @@ class FiniteVolume1d:
                 sig[i, j] = do_weights[i] * scat_prob[j]
 
         # --------------------------------------------------------------------
-        #                           MATRIX ASSEMBLY
+        #                           ASSEMBLY
         # --------------------------------------------------------------------
 
         alpha_tiled = np.tile(mesh.integrate_cellwise(mp.abs_fun, quadrature),
@@ -218,10 +234,6 @@ class FiniteVolume1d:
                 shape=(self.n_dof, self.n_dof)).tocsr()
 
             self.lambda_prec = self.lambda_prec.tocsr()
-
-        # --------------------------------------------------------------------
-        #                       LOAD VECTOR ASSEMBLY
-        # --------------------------------------------------------------------
 
         self.load_vec = mp.emiss * mp.s_e * np.ravel(alpha_tiled)
 
@@ -272,10 +284,27 @@ class FiniteVolume1d:
                                offset + mesh.south_east_corner()]] -= \
                     mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
 
-    def compute_scalar_product(self, outer_normals, ord_dir):
+    def __compute_scalar_product__(self, outer_normals, ord_dir):
+        """
+        Computes the scalar product between all discrete ordinate directions
+        and all outer normals. Accounts for errors is floating point
+        representation.
 
-        # scalar products with the directions Dir.W and Dir.S can be computed
-        # from the ones for Dir.E and Dir.N by switching the sign
+        Parameters
+        ----------
+        outer_normals : <mesh.Direction : np.ndarray> dictionary
+            The four outer normals of the rectangular domain
+        ord_dir : list of np.ndarray
+            List of all the discrete ordinate directions
+
+        Returns
+        -------
+        <mesh.Direction : list of floats> dictionary
+            A dictionary with the directions as keys and a list of the scalar
+            products of all the discrete ordinate directions with the outer
+            normal in this direction as values.
+        """
+
         nn = {Dir.E: [], Dir.N: [], Dir.W: [], Dir.S: []}
 
         for d, nn_list in nn.items():
@@ -284,7 +313,7 @@ class FiniteVolume1d:
                 prod = np.dot(outer_normals[d], nm)
 
                 # even for 1e6 ordinate directions, the smallest absolute value
-                # of a scalar product between ordinate and normal is on the
+                # of a scalar product between ordinate and normal, is on the
                 # order 1e-6. Values smaller than 1e-12 are thus guaranteed to
                 # stem from errors in floating point calculations.
                 if np.abs(prod) < 1e-12:
@@ -295,6 +324,29 @@ class FiniteVolume1d:
         return nn
 
     def __assemble_transport__(self, mesh, n_dot_n, ord_dir, num_flux):
+        """
+        Assembles the matrix corresponding to the transport term in sparse
+        coordinate format.
+
+        Parameters
+        ----------
+        mesh : mesh.UniformMesh
+            Uniform mesh used for the discretization.
+        n_dot_n : <mesh.Direction : list of floats> dictionary
+            Dictionary containing all the relevant scala products, as returned
+            by __compute_scalar_products__.
+        ord_dir : list of np.ndarray
+            List of all the discrete ordinate directions.
+        num_flux : string
+            Numerical flux function to be used in discretization
+
+        Returns
+        -------
+        scipy.sparse.coo_matrix
+
+        Sparse matrix representing the discretized transport term in coordinate
+        format.
+        """
 
         h_h = mesh.h[0]
         h_v = mesh.h[1]
@@ -507,6 +559,26 @@ class FiniteVolume1d:
         return sps.block_diag(block_diag)
 
     def __assemble_absorption__(self, alpha_tiled, xip1):
+        """
+        Assembles the matrix corresponding to the absorption term in sparse
+        coordinate format.
+
+        Parameters
+        ----------
+        alpha_tiled : one dimensional np.ndarray
+            The integrals of the absorption coefficient over the cells of the
+            mesh, repeated n_ordinate times.
+        xip1 : float
+            The ratio between scattering coefficient and absorption coefficient
+            plus 1.0.
+
+        Returns
+        -------
+        scipy.sparse.coo_matrix
+
+        Sparse matrix representing the discretized absorption term in
+        coordinate format.
+        """
 
         # for the pure absorption part, there is neither a coupling between
         # neighbouring cells nor between different ordinates. The resulting
@@ -516,6 +588,26 @@ class FiniteVolume1d:
                          shape=(self.n_dof, self.n_dof))
 
     def __assemble_scattering__(self, alpha, sig, xi):
+        """
+        Assembles the matrix corresponding to the scattering term in sparse
+        coordinate format.
+
+        Parameters
+        ----------
+        alpha : one dimensional np.ndarray
+            The integrals of the absorption coefficient over the cells of the
+            mesh.
+        xip1 : float
+            The ratio between scattering coefficient and absorption coefficient
+            plus 1.0.
+
+        Returns
+        -------
+        scipy.sparse.coo_matrix
+
+        Sparse matrix representing the discretized scattering term in
+        coordinate format.
+        """
 
         # For the scattering part there is no coupling between
         # neighbouring cells, however there is coupling between

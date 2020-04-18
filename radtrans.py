@@ -108,7 +108,7 @@ class RadiativeTransfer:
         # define model problem and discretization
         model_problem = modelProblem.ModelProblem(
             temperature, frequency, albedo, emissivity, scattering,
-            absorption_coeff.abs_fun, boundary_values)
+            absorption_coeff.abs_fun)
 
         # time mesh generation
         start_time = timeit.default_timer()

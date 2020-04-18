@@ -31,16 +31,13 @@ class ModelProblem:
         alpha_scat = xi * alpha_abs.
     xip1 : float
         The value of xi + 1.0, stored for conveniency.
-    inflow_bc : tuple of length 2
-        Boundary conditions for the inflow boundaries of the corresponding
-        discrete ordinates.
     s_e : float
         Value of the dimensionless planck function for given frequency of
         radiation and temperature of medium.
     """
 
     def __init__(self, temperature, frequency, albedo, emissivity,
-                 scattering, absorption_fun, inflow_bc):
+                 scattering, absorption_fun):
         """
         Parameters
         ----------
@@ -58,10 +55,6 @@ class ModelProblem:
             Type of scattering process assumed for the medium
         absorption_fun : callable
             Absorption coefficient assumed for the medium.
-        inflow_bc : tuple of length 2
-            Boundary conditions for the inflow boundaries of the corresponding
-            discrete ordinates. In one dimension there are exactly two
-            ordinates.
         """
         self.s_e = 0
 

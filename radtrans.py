@@ -19,6 +19,24 @@ class RadiativeTransfer:
     and solver parameters and discretizes and solves the radiative transfer
     problem for the given parameters. The numerical solution is then
     visualized.
+
+    Attributes
+    ----------
+    n_ord : integer
+        Total number of discrete ordinates
+    outputType : string
+        String specifying which part or function of the solution to visualize
+    mesh : mesh.UniformMesh
+        Uniform mesh used to partition the domain of the model problem
+    sol : numpy.ndarray
+        The numerical approximation to the solution of the model problem
+
+    Methods
+    -------
+    main(argv)
+        The driver for obtaining the numerical approximation
+    visualize()
+        Visualization of the solution
     """
 
     def main(self, argv):
@@ -207,12 +225,12 @@ class RadiativeTransfer:
 
         linear_solver = solver.Solver(solver_name, prec)
 
-        self.x = linear_solver.solve(A, b, x_in)[0]
+        self.sol = linear_solver.solve(A, b, x_in)[0]
 
     def visualize(self):
 
         visualization.visualize(
-            self.x, self.mesh, self.n_ord, self.outputType)
+            self.sol, self.mesh, self.n_ord, self.outputType)
 
 
 if __name__ == "__main__":

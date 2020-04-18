@@ -618,13 +618,13 @@ class FiniteVolume:
                     in_bndry += [d]
 
             offset = m * mesh.n_tot
-        
+
             if mesh.dim == 1:
 
                 for d in in_bndry:
                     load_vec[offset + mesh.boundary_cells(d)] -= \
-                    mesh.h[1] * n_dot_n[d][m] * self.inflow_bc[m]
-            
+                        mesh.h[1] * n_dot_n[d][m] * self.inflow_bc[m]
+
             else:
 
                 if Dir.E in in_bndry:
@@ -633,7 +633,7 @@ class FiniteVolume:
                         mesh.h[1] * n_dot_n[Dir.E][m] * self.inflow_bc[m]
 
                     load_vec[[offset + mesh.south_east_corner(),
-                            offset + mesh.north_east_corner()]] -= \
+                              offset + mesh.north_east_corner()]] -= \
                         mesh.h[1] * n_dot_n[Dir.E][m] * self.inflow_bc[m]
 
                 if Dir.W in in_bndry:
@@ -642,7 +642,7 @@ class FiniteVolume:
                         mesh.h[1] * n_dot_n[Dir.W][m] * self.inflow_bc[m]
 
                     load_vec[[offset + mesh.south_west_corner(),
-                            offset + mesh.north_west_corner()]] -= \
+                              offset + mesh.north_west_corner()]] -= \
                         mesh.h[1] * n_dot_n[Dir.W][m] * self.inflow_bc[m]
 
                 if Dir.N in in_bndry:
@@ -651,7 +651,7 @@ class FiniteVolume:
                         mesh.h[0] * n_dot_n[Dir.N][m] * self.inflow_bc[m]
 
                     load_vec[[offset + mesh.north_west_corner(),
-                            offset + mesh.north_east_corner()]] -= \
+                              offset + mesh.north_east_corner()]] -= \
                         mesh.h[0] * n_dot_n[Dir.N][m] * self.inflow_bc[m]
 
                 if Dir.S in in_bndry:
@@ -660,7 +660,7 @@ class FiniteVolume:
                         mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
 
                     load_vec[[offset + mesh.south_west_corner(),
-                            offset + mesh.south_east_corner()]] -= \
+                              offset + mesh.south_east_corner()]] -= \
                         mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
 
         return load_vec

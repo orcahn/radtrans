@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def visualize(sol, mesh, n_ord, outputType):
+def visualize(sol, abs_fun, mesh, n_ord, outputType):
     """
     Visualize the numerical results
 
@@ -20,27 +20,45 @@ def visualize(sol, mesh, n_ord, outputType):
 
     if mesh.dim == 1:
 
+        domain = mesh.cell_centers_1d()
+
+        plt.subplot(1, 2, 1)
+        plt.title('Absorption Coefficient')
+        plt.plot(domain, np.array([abs_fun([x]) for x in domain]))
+
+        plt.subplot(1, 2, 2)
+        plt.title('NumericalSolution')
+
         if outputType == "firstOrdinate":
 
-            plt.step(mesh.cell_centers_1d(),
-                     sol[:mesh.n_cells[0]], where='mid')
+            plt.step(domain, sol[:mesh.n_cells[0]], where='mid')
 
         elif outputType == "meanIntensity":
 
-            plt.step(mesh.cell_centers_1d(), np.mean(
-                (sol[-mesh.n_cells[0]:],
-                    sol[:mesh.n_cells[0]]),
-                axis=0), where='mid')
+            plt.step(domain, np.mean((sol[-mesh.n_cells[0]:],
+                                      sol[:mesh.n_cells[0]]),
+                                     axis=0), where='mid')
 
         elif outputType == "diffusion":
 
-            plt.step(mesh.cell_centers_1d(), sol)
+            plt.step(domain, sol)
 
         else:
 
             raise Exception('Unknown output type: ' + outputType)
 
     else:   # mesh.dim == 2
+
+        abs_coeff_val = [[abs_fun([x, y]) for x in mesh.grid[0][0, :]]
+                         for y in mesh.grid[1][:, 0]]
+
+        plt.subplot(1, 2, 1)
+        plt.title('Absorption Coefficient')
+        plt.pcolormesh(mesh.grid[0], mesh.grid[1], abs_coeff_val,
+                       cmap='Greys')
+
+        plt.subplot(1, 2, 2)
+        plt.title('Numerical Solution')
 
         if outputType == "firstOrdinate":
 

@@ -22,21 +22,23 @@ class RadiativeTransfer:
 
     Attributes
     ----------
+    model_problem : modelProblem.ModelProblem
+        Model problem to be solved.
     n_ord : integer
-        Total number of discrete ordinates
+        Total number of discrete ordinates.
     outputType : string
-        String specifying which part or function of the solution to visualize
+        String specifying which part or function of the solution to visualize.
     mesh : mesh.UniformMesh
-        Uniform mesh used to partition the domain of the model problem
+        Uniform mesh used to partition the domain of the model problem.
     sol : numpy.ndarray
-        The numerical approximation to the solution of the model problem
+        The numerical approximation to the solution of the model problem.
 
     Methods
     -------
     main(argv)
-        The driver for obtaining the numerical approximation
+        The driver for obtaining the numerical approximation.
     visualize()
-        Visualization of the solution
+        Visualization of the solution.
     """
 
     def main(self, argv):
@@ -59,8 +61,8 @@ class RadiativeTransfer:
         assert scattering in ['none', 'isotropic'], \
             'Scattering type ' + scattering + ' currently not supported.'
 
-        abs_type = config['MODEL']['absorptionType']
-        absorption_coeff = absorption.Absorption(abs_type, domain)
+        self.abs_type = config['MODEL']['absorptionType']
+        absorption_coeff = absorption.Absorption(self.abs_type, domain)
 
         self.n_ord = config.getint('DISCRETIZATION', 'n_ordinates')
         n_cells = tuple(
@@ -124,7 +126,7 @@ class RadiativeTransfer:
         self.outputType = str(config['OUTPUT']['type'])
 
         # define model problem and discretization
-        model_problem = modelProblem.ModelProblem(
+        self.model_problem = modelProblem.ModelProblem(
             temperature, frequency, albedo, emissivity, scattering,
             absorption_coeff.abs_fun)
 
@@ -142,14 +144,14 @@ class RadiativeTransfer:
         if scattering == 'isotropic':
 
             disc = discretization.FiniteVolume(
-                model_problem, self.mesh, self.n_ord, boundary_values, flux,
-                quad_method)
+                self.model_problem, self.mesh, self.n_ord, boundary_values,
+                flux, quad_method)
 
         else:
 
             disc = discretization.FiniteVolume(
-                model_problem, self.mesh, self.n_ord, boundary_values, flux,
-                quad_method)
+                self.model_problem, self.mesh, self.n_ord, boundary_values,
+                flux, quad_method)
 
         elapsed_time = timeit.default_timer() - start_time
 
@@ -179,7 +181,7 @@ class RadiativeTransfer:
 
             if initial_guess == "thermalEmission":
 
-                x_in = np.full(disc.n_dof, model_problem.s_e)
+                x_in = np.full(disc.n_dof, self.model_problem.s_e)
 
             elif initial_guess == "noScattering":
 
@@ -187,12 +189,12 @@ class RadiativeTransfer:
 
                     sol1 = disc.inflow_bc[0] * \
                         np.exp(-self.mesh.cell_centers()) + \
-                        model_problem.s_e * \
+                        self.model_problem.s_e * \
                         (1 - np.exp(-self.mesh.cell_centers()))
 
                     sol2 = disc.inflow_bc[1] * \
                         np.exp(-self.mesh.cell_centers()[::-1]) + \
-                        model_problem.s_e * \
+                        self.model_problem.s_e * \
                         (1 - np.exp(-self.mesh.cell_centers()[::-1]))
 
                     x_in = np.concatenate((sol1, sol2), axis=0)
@@ -200,7 +202,7 @@ class RadiativeTransfer:
                 else:
 
                     # create model problem without scattering
-                    ns_mp = model_problem
+                    ns_mp = self.model_problem
                     ns_mp.scat = 'none'
 
                     ns_disc = discretization.FiniteVolume(
@@ -229,7 +231,8 @@ class RadiativeTransfer:
     def visualize(self):
 
         visualization.visualize(
-            self.sol, self.mesh, self.n_ord, self.outputType)
+            self.sol, self.model_problem.abs_fun, self.mesh, self.n_ord,
+            self.outputType)
 
 
 if __name__ == "__main__":

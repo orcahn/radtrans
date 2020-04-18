@@ -12,6 +12,24 @@ class Direction(IntEnum):
 
 
 def quadrature(fun, w, qn):
+    """
+    General quadrature in one or two dimensions
+
+    Parameters
+    ----------
+    fun : callable
+        The function to be integrated
+    w : list of lists of floats
+        Quadrature weights. First entry corresponds to a quadrature node,
+        second entry to a dimension.
+    qn : list of lists of floats
+        Quadrature nodes. First entry corresponds to a node, second to
+        a dimension.
+
+    Returns
+    float
+        The integral of fun over the domain implied by the quadrature nodes.
+    """
 
     integral = 0.0
 
@@ -31,35 +49,44 @@ class UniformMesh:
     dim : integer
         The dimension of the domain.
     dom_len : tuple of floats
-        Length of the domain.
+        Length of the domain along each dimension
+    outer_normal : <mesh.Direction: np.ndarray> dictionary
+        Outer normals to corresponding directions
     n_cells : tuple of integers
         tuple indicating the number of cells along each dimension.
     n_tot : integer
         Total number of cells the domain is partitioned into.
     h : tuple of floats
         Length of a single cell along each dimension
-    outer_normal : {mesh.Direction: np.ndarray} dict
-        Outer normals to corresponding directions
-    grid : tuple of np.ndarray
+    grid : numpy.meshgrid
         Cartesian Coordinates of the gridpoints.
 
     Methods
     -------
+    __integrate_cellwise__1d__(abs_fun, quad_method)
+        Compute the L2 scalar product of a function with the basis functions
+        corresponding to each cell in one dimension.
+    __integrate_cellwise__2d__(abs_fun, quad_method)
+        Compute the L2 scalar product of a function with the basis functions
+        corresponding to each cell in two dimensions.
     integrate_cellwise(abs_fun, quad_method)
         Compute the L2 scalar product of a function with the basis functions
         corresponding to each cell.
-    inflow_boundary_cells(ord_index)
-        Compute the cells with part on the inflow boundary of specific ordinate
-    is_outflow_boundary_cell(cell, ord_index)
-        Test for a cell to have part on the outflow boundary of specific
-        ordinate
-    boundary_cells(direction)
-        Compute the cells with part on the domain boundary in specific
-        direction
     interior_cells()
-        Compute indices of the interior cells
-    cell_centers()
-        Compute the coordinates of the cell centers
+        Compute the indices of the interior cells
+    boundary_cells(direction)
+        Compute the indices of the cells with part on the domain boundary
+        in a given direction. Corner cells are excluded.
+    cell_centers_1d()
+        Compute the cell centers for a one dimensional mesh.
+    south_west_corner()
+        Compute index of the cell in the south west corner of the mesh
+    south_east_corner()
+        Compute index of the cell in the south east corner of the mesh
+    north_west_corner()
+        Compute index of the cell in the north west corner of the mesh
+    north_east_corner()
+        Compute index of the cell in the north east corner of the mesh
     """
 
     def __init__(self, dimension, domain_length, n_cells):
@@ -68,10 +95,10 @@ class UniformMesh:
         ----------
         dimension : integer
             The dimension of the domain
-        domain_length : float
-            Length of the one-dimensional domain
-        n_cells : integer
-            Number of cells
+        domain_length : tuple of floats
+            Length of the domain along each dimension
+        n_cells : tuple of integers
+            Number of cells along each dimension
         """
 
         assert dimension in [1, 2], \
@@ -140,6 +167,23 @@ class UniformMesh:
               '\n\n')
 
     def __integrate_cellwise_1d__(self, abs_fun, quad_method):
+        """
+        Computes the L2 scalar product of a function with the basis functions
+        corresponding to each cell in one dimension.
+
+        Parameters
+        ----------
+        abs_fun : callable
+            The absorption function of the model problem
+        quad_method : string
+            The quadrature method to be used
+
+        Returns
+        -------
+        numpy.ndarray
+            An array, where each entry is given by the integral of the
+            absorption coefficient over the cell with according index.
+        """
 
         # In a typical application, cell sizes are so small that low order
         # quadrature is of acceptable accuracy. Tests showed, that higher order
@@ -165,22 +209,21 @@ class UniformMesh:
 
     def __integrate_cellwise_2d__(self, abs_fun, quad_method):
         """
-        Compute the L2 scalar product of a function with the basis functions
-        corresponding to each cell.
+        Computes the L2 scalar product of a function with the basis functions
+        corresponding to each cell in a two dimensional mesh.
 
         Parameters
         ----------
-        fun : callable
-            The function to be used as argument in the scalar product
+        abs_fun : callable
+            The absorption function of the model problem
         quad_method : string
-            Specifies which quadrature method to use in the computation of
-            the scalar product.
+            The quadrature method to be used
 
         Returns
         -------
-        np.ndarray of shape (n_tot,)
-            Array with same number of entries as there are cells. Each entry k
-            corresponds to the L2 scalar product of fun with basis function k.
+        numpy.ndarray
+            An array, where each entry is given by the integral of the
+            absorption coefficient over the cell with according index.
         """
 
         # In a typical application, cell sizes are so small that low order
@@ -222,6 +265,23 @@ class UniformMesh:
         return np.array([q_fun(cell) for cell in range(self.n_tot)])
 
     def integrate_cellwise(self, abs_fun, quad_method):
+        """
+        Computes the L2 scalar product of a function with the basis functions
+        corresponding to each cell for the given mesh.
+
+        Parameters
+        ----------
+        abs_fun : callable
+            The absorption function of the model problem
+        quad_method : string
+            The quadrature method to be used
+
+        Returns
+        -------
+        numpy.ndarray
+            An array, where each entry is given by the integral of the
+            absorption coefficient over the cell with according index.
+        """
 
         if self.dim == 1:
             return self.__integrate_cellwise_1d__(abs_fun, quad_method)
@@ -229,6 +289,14 @@ class UniformMesh:
             return self.__integrate_cellwise_2d__(abs_fun, quad_method)
 
     def interior_cells(self):
+        """
+        Computes the indices of the interior cells of the mesh
+
+        Returns
+        -------
+        numpy.ndarray
+            An array with the indices of the interior cells
+        """
 
         # start with the lowest interior row
         interior_row = np.arange(self.n_cells[0] + 1, 2 * self.n_cells[0] - 1)
@@ -252,6 +320,20 @@ class UniformMesh:
             return interior_indices
 
     def boundary_cells(self, direction):
+        """
+        Computes the indices of the cells with at least one face on the domain
+        boundary in a given direction.
+
+        Parameters
+        ----------
+        direction : mesh.Direction
+            The direction of the domain boundary that is of interest
+
+        Returns
+        -------
+        numpy.ndarray
+            An array with the indices of the boundary cells
+        """
 
         if direction == Direction.E:
 
@@ -292,7 +374,7 @@ class UniformMesh:
 
     def cell_centers_1d(self):
         """
-        Coordinates of the cell centers
+        Coordinates of the cell centers in a one-dimensional mesh
 
         Returns
         -------
@@ -312,17 +394,49 @@ class UniformMesh:
             raise Exception('cell_centers_1d() only works for in 1 dimension')
 
     def south_west_corner(self):
+        """
+        Computes the index of the cell in the south western corner of the mesh.
+
+        Returns
+        -------
+        integer
+            index of the south western corner cell.
+        """
 
         return 0
 
     def south_east_corner(self):
+        """
+        Computes the index of the cell in the south eastern corner of the mesh.
+
+        Returns
+        -------
+        integer
+            index of the south eastern corner cell.
+        """
 
         return self.n_cells[0] - 1
 
     def north_west_corner(self):
+        """
+        Computes the index of the cell in the north western corner of the mesh.
+
+        Returns
+        -------
+        integer
+            index of the north western corner cell.
+        """
 
         return (self.n_cells[1] - 1) * self.n_cells[0]
 
     def north_east_corner(self):
+        """
+        Computes the index of the cell in the north eastern corner of the mesh.
+
+        Returns
+        -------
+        integer
+            index of the north eastern corner cell.
+        """
 
         return self.n_tot - 1

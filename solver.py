@@ -6,17 +6,36 @@ import scipy.sparse.linalg as spsla
 from scipy.sparse import identity
 
 
-def invert_transport(M, x, n_dof, n_ord):
+def invert_transport(M, x, n_ord):
+    """
+    Solver specialized in inverting the discretized transport and absorption
+    terms. Technically it solves M*p=x, where M is a block-diagonal matrix.
 
-    if isinstance(M, type(identity(n_dof))):
+    Parameters
+    ----------
+    M : scipy.sparse.csr_matrix
+        Explicit sparse representation of the linear preconditioner used in
+        the lambda iteration.
+    x : numpy.ndarray
+        Dummy for a vector to which the preconditioner is applied
+    n_ord : integer
+        Total number of discrete ordinates used in discretization
+
+    Returns
+    -------
+    numpy.ndarray
+        Array representing the application of the preconditioner
+    """
+
+    if isinstance(M, type(identity(x.size))):
 
         return x
 
     else:
 
-        nc = n_dof // n_ord
+        nc = x.size // n_ord
 
-        prec_vec = np.empty(n_dof)
+        prec_vec = np.empty(x.size)
 
         # invert the nc x nc diagonal blocks
         for m in range(n_ord):
@@ -28,6 +47,21 @@ def invert_transport(M, x, n_dof, n_ord):
 
 
 def invert_diagonal(M, x):
+    """
+    Preconditioner inverting the diagonal
+
+    Parameters
+    ----------
+    M : scipy.sparse.csr_matrix
+        Explicit sparse representation of the linear preconditioner
+    x : numpy.ndarray
+        Dummy for a vector to which the preconditioner is applied
+
+    Returns
+    -------
+    numpy.ndarray
+        Array representing the application of the preconditioner
+    """
 
     return np.multiply(np.reciprocal(M.diagonal()), x)
 
@@ -47,17 +81,30 @@ class solve_counter(object):
 
 class Preconditioner:
     """
-    For radiative transfer problems, it is beneficial
-    to use the Lambda iteration as a preconditioner
+    Preconditioner used in the iterative solution of the discretized
+    system
+
+    Attributes
+    ----------
+    M : scipy.sparse.csr_matrix
+        Explicit sparse representation of the linear preconditioner.
     """
 
     def __init__(self, disc, type):
+        """
+        Parameters
+        ----------
+        disc : discretization.FiniteVolume
+            Discretization of the continuous model problem
+        type : string
+            Type of preconditioner to use
+        """
 
         if type == 'lambdaIteration':
             self.M = spsla.LinearOperator(
                 (disc.n_dof, disc.n_dof),
                 lambda x: invert_transport(disc.lambda_prec, x,
-                                           disc.n_dof, disc.n_ord))
+                                           disc.n_ord))
 
         elif type == 'diagonal':
             self.M = spsla.LinearOperator(
@@ -70,18 +117,58 @@ class Preconditioner:
 
 class Solver:
     """
-    Class for the linear solvers.
-    It can be specified as a direct or iterative GMRES solver.
-    In case GMRES or BiCGSTAB is selected, a preconditioner can
-    be specified. Additionally, one can supply an initial guess.
+    Class for the linear solvers for the discretized system
+
+    Attributes
+    ----------
+    name : string
+        Type of the solver to be used
+    prec : solver.Preconditioner
+        Preconditioner to be used for iterative solvers
+
+    Methods
+    -------
+    solve(A, b, x_in=None)
+        Solve the linear system with Matrix A, right hand side b and initial
+        guess x_in
     """
 
     def __init__(self, name, preconditioner):
+        """
+        Parameters
+        ----------
+        name : string
+            Type of the solver to be used
+        preconditioner : solver.Preconditioner
+            Preconditioner to be used for iterative solvers
+        """
 
         self.name = name
         self.prec = preconditioner
 
     def solve(self, A, b, x_in=None):
+        """
+        Solve the linear system
+
+        Parameters
+        ----------
+        A : scipy.sparse.csr_matrix
+            Sparse stiffness matrix of the system
+        b : numpy.ndarray
+            Load vector of the system
+        x_in : None or numpy.ndarray
+            Initial guess for the solution using an iterative solver
+
+        Returns
+        -------
+        numpy.ndarray
+            solution to the linear system
+        integer
+            Number of iterations that were performed
+        float
+            Time it took solving the system
+
+        """
 
         if self.name == "SparseDirect":
 
@@ -93,7 +180,7 @@ class Solver:
             print('Sparse direct solver:    ' +
                   "% 10.3e" % (elapsed_time) + ' s')
 
-            return x, None, elapsed_time
+            return x, 1, elapsed_time
 
         elif self.name == "GMRES":
 

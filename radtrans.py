@@ -210,7 +210,6 @@ class RadiativeTransfer:
                     # one step of lambda iteration
                     x_in = solver.invert_transport(ns_disc.stiff_mat,
                                                    ns_disc.load_vec,
-                                                   ns_disc.n_dof,
                                                    self.n_ord)
 
             else:

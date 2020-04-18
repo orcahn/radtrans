@@ -65,7 +65,7 @@ class RadiativeTransfer:
             boundary_values = tuple(float(config['BOUNDARY_VALUES']['value'])
                                     for m in range(self.n_ord))
 
-        elif config['BOUNDARY_VALUES']['type'] == 'inc_east':
+        elif config['BOUNDARY_VALUES']['type'] == 'inc_west':
 
             boundary_values = (config.getfloat('BOUNDARY_VALUES', 'value'),
                                *[0.0 for m in range(self.n_ord - 1)])

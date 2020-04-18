@@ -3,6 +3,20 @@ import matplotlib.pyplot as plt
 
 
 def visualize(sol, mesh, n_ord, outputType):
+    """
+    Visualize the numerical results
+
+    Parameters
+    ----------
+    sol : numpy.ndarray
+        Numerical approximation to the solution of the model_problem
+    mesh : mesh.UniformMesh
+        Uniform mesh used to partition the domain of the model problem
+    n_ord : integer
+        Total number of discrete ordinates used in the discretization
+    outputType : string
+        String specifying which part or function of the solution to visualize
+    """
 
     if mesh.dim == 1:
 

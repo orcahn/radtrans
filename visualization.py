@@ -1,6 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from matplotlib import rc
+
+font = {'family': 'serif',
+        'size': 16}
+
+rc('text', usetex=True)
+rc('font', **font)
+
 
 def visualize(sol, abs_fun, mesh, n_ord, outputType):
     """
@@ -18,30 +26,35 @@ def visualize(sol, abs_fun, mesh, n_ord, outputType):
         String specifying which part or function of the solution to visualize
     """
 
+    fig, (ax0, ax1) = plt.subplots(1, 2)
+
+    ax0.set_title('Absorption Coefficient')
+    ax0.set_xlabel('x [m]')
+    ax0.set_ylabel('y [m]')
+
+    ax1.set_title('Numerical Solution')
+    ax1.set_xlabel('x [m]')
+    ax1.set_ylabel('y [m]')
+
     if mesh.dim == 1:
 
         domain = mesh.cell_centers_1d()
 
-        plt.subplot(1, 2, 1)
-        plt.title('Absorption Coefficient')
-        plt.plot(domain, np.array([abs_fun([x]) for x in domain]))
-
-        plt.subplot(1, 2, 2)
-        plt.title('NumericalSolution')
+        ax0.plot(domain, np.array([abs_fun([x]) for x in domain]))
 
         if outputType == "firstOrdinate":
 
-            plt.step(domain, sol[:mesh.n_cells[0]], where='mid')
+            ax1.step(domain, sol[:mesh.n_cells[0]], where='mid')
 
         elif outputType == "meanIntensity":
 
-            plt.step(domain, np.mean((sol[-mesh.n_cells[0]:],
+            ax1.step(domain, np.mean((sol[-mesh.n_cells[0]:],
                                       sol[:mesh.n_cells[0]]),
                                      axis=0), where='mid')
 
         elif outputType == "diffusion":
 
-            plt.step(domain, sol)
+            ax1.step(domain, sol)
 
         else:
 
@@ -52,13 +65,14 @@ def visualize(sol, abs_fun, mesh, n_ord, outputType):
         abs_coeff_val = [[abs_fun([x, y]) for x in mesh.grid[0][0, :]]
                          for y in mesh.grid[1][:, 0]]
 
-        plt.subplot(1, 2, 1)
-        plt.title('Absorption Coefficient')
-        plt.pcolormesh(mesh.grid[0], mesh.grid[1], abs_coeff_val,
-                       cmap='Greys')
-
-        plt.subplot(1, 2, 2)
-        plt.title('Numerical Solution')
+        if min(mesh.h) > 0.05:
+            abs_plot = ax0.pcolormesh(mesh.grid[0], mesh.grid[1],
+                                      abs_coeff_val,
+                                      cmap='Blues', ec='k', linewidths=0.01,)
+        else:
+            abs_plot = ax0.pcolormesh(mesh.grid[0], mesh.grid[1],
+                                      abs_coeff_val,
+                                      cmap='Blues')
 
         if outputType == "firstOrdinate":
 
@@ -79,8 +93,18 @@ def visualize(sol, abs_fun, mesh, n_ord, outputType):
 
             z = sol.reshape((mesh.n_cells[1], mesh.n_cells[0]), order='C')
 
-        plt.figure(1)
-        plt.pcolormesh(mesh.grid[0], mesh.grid[1], z)
-        plt.colorbar()
+        sol_plot = ax1.pcolormesh(mesh.grid[0], mesh.grid[1], z)
+
+        abs_cbar = fig.colorbar(abs_plot, ax=ax0)
+        abs_cbar.ax.set_ylabel(r"$\alpha \; [\frac{1}{m}]$",
+                               labelpad=26, rotation=270)
+
+        sol_cbar = fig.colorbar(sol_plot, ax=ax1)
+        sol_cbar.ax.set_ylabel(
+            r"intensity per $\mathcal{I} = \frac{c^3}{2 h^2 \nu^3}$ *",
+            labelpad=26, rotation=270)
+        ax1.text(0.5, -0.2,
+                 r"*speed of light c, planck constant h, frequency $\nu$",
+                 size=12)
 
     plt.show()

@@ -46,22 +46,45 @@ def step_abs(x, L):
         return 0.0
 
 
-# TODO: make it work in 2 dimensions
 # piecewise constant absorption with random values
 # following a gaussian distribution
-def gaussian_random_piecewise(x, constants):
+def gaussian_random_piecewise(x, constants, L):
 
-    bool_array1 = [x >= 0.5 * i for i in range(len(constants))]
-    bool_array2 = [x < 0.5 * (i + 1) for i in range(len(constants))]
+    if len(x) == 1:
 
-    return np.piecewise(x, np.logical_and(bool_array1, bool_array2), constants)
+        h = L[0] / 10.
+        bool_array1 = [x >= h * i for i in range(len(constants))]
+        bool_array2 = [x < h * (i + 1) for i in range(len(constants))]
+
+        return np.piecewise(
+            x, np.logical_and(bool_array1, bool_array2), constants)
+
+    else:
+
+        h = [L[0] / 10., L[1] / 10.]
+        bool_array1 = [x[0] >= h[0] * i for i in range(len(constants) // 10)]
+        bool_array2 = [x[0] < h[0] * (i + 1)
+                       for i in range(len(constants) // 10)]
+        x_index = np.nonzero(np.logical_and(bool_array1, bool_array2))
+
+        bool_array3 = [x[1] >= h[1] * i for i in range(len(constants) // 10)]
+        bool_array4 = [x[1] < h[1] * (i + 1)
+                       for i in range(len(constants) // 10)]
+        y_index = np.nonzero(np.logical_and(bool_array3, bool_array4))
+
+        if len(x_index[0] > 0) and len(y_index[0] > 0):
+
+            return constants[y_index[0] * 10 + x_index[0]][0]
+
+        else:
+
+            return 0.0
 
 
 class Absorption:
     """
     Wrapper for the spatially varying absorption coefficient in the radiative
     transfer problem.
-
     Attributes
     ----------
     abs_fun : callable
@@ -101,19 +124,21 @@ class Absorption:
 
             self.abs_fun = lambda x: step_abs(x, domain_length)
 
+        elif abs_fun_type == 'gaussianRandomPiecewise':
+
+            # Should be 10 in 1D, 100 in 2D
+            num_patches = 10 ** len(domain_length)
+
+            # Samples from a Gaussian distribution with mean 0.5
+            # and standard deviation 0.15
+            constants = np.array(
+                [0.15 * np.random.randn() + 0.5
+                 for i in range(num_patches)]).clip(min=0, max=1)
+
+            self.abs_fun = lambda x: gaussian_random_piecewise(
+                x, constants, domain_length)
+
         else:
 
             raise Exception('Absorption type ' + abs_fun_type +
                             ' currently not supported.')
-
-        # elif abs_fun_type == 'gaussianRandomPiecewise':
-
-        #     num_intervals = int(domain_length * 2)
-
-        #     # Samples from a Gaussian distribution with mean 0.5
-        #     # and standard deviation 0.15
-        #     constants = np.array(
-        #         [0.15 * np.random.randn() + 0.5
-        #          for i in range(num_intervals)]).clip(min=0, max=1)
-
-        #     self.abs_fun = lambda x: gaussian_random_piecewise(x, constants)

@@ -3,13 +3,13 @@ import timeit
 import configparser
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 import modelProblem
 import absorption
 import mesh
 import discretization
 import solver
+import visualization
 
 
 class RadiativeTransfer:
@@ -19,12 +19,32 @@ class RadiativeTransfer:
     and solver parameters and discretizes and solves the radiative transfer
     problem for the given parameters. The numerical solution is then
     visualized.
+
+    Attributes
+    ----------
+    model_problem : modelProblem.ModelProblem
+        Model problem to be solved.
+    n_ord : integer
+        Total number of discrete ordinates.
+    outputType : string
+        String specifying which part or function of the solution to visualize.
+    mesh : mesh.UniformMesh
+        Uniform mesh used to partition the domain of the model problem.
+    sol : numpy.ndarray
+        The numerical approximation to the solution of the model problem.
+
+    Methods
+    -------
+    main(argv)
+        The driver for obtaining the numerical approximation.
+    visualize()
+        Visualization of the solution.
     """
 
     def main(self, argv):
 
         # parse parameter file
-        config = configparser.ConfigParser()
+        config = configparser.ConfigParser(allow_no_value=True)
         config.read(argv[1:])
 
         dimension = int(config['MODEL']['dimension'])
@@ -32,32 +52,64 @@ class RadiativeTransfer:
         frequency = float(config['MODEL']['frequency'])
         albedo = float(config['MODEL']['albedo'])
         emissivity = float(config['MODEL']['emissivity'])
-        domain = float(config['MODEL']['domain'])
-        abs_type = config['MODEL']['absorptionType']
+
+        domain = tuple(
+            map(float,
+                config['MODEL']['domain'].strip().split(',')))
 
         scattering = str(config['MODEL']['scattering'])
         assert scattering in ['none', 'isotropic'], \
             'Scattering type ' + scattering + ' currently not supported.'
 
-        absorption_coeff = absorption.Absorption(abs_type, domain)
+        self.abs_type = config['MODEL']['absorptionType']
+        absorption_coeff = absorption.Absorption(self.abs_type, domain)
 
-        boundary_values = [
-            float(
-                e.strip()) for e in config.get(
-                'MODEL',
-                'boundaryValues').split(',')]
+        self.n_ord = config.getint('DISCRETIZATION', 'n_ordinates')
+        n_cells = tuple(
+            map(int,
+                config['DISCRETIZATION']['n_cells'].strip().split(',')))
 
-        quadrature_weights = [
-            float(
-                e.strip()) for e in config.get(
-                'MODEL',
-                'quadratureWeights').split(',')]
+        # in one dimension there are only two possible discrete ordinates
+        if dimension == 1 and self.n_ord != 2:
 
-        self.method = str(config['DISCRETIZATION']['method'])
+            print('\nWarning: In one dimension two discrete ordinates' +
+                  '(+1.0, -1.0) will be used!')
+            self.n_ord = 2
 
-        n_cells = int(config['DISCRETIZATION']['n_cells'])
-        n_ordinates = int(config['DISCRETIZATION']['n_ordinates'])
         flux = str(config['DISCRETIZATION']['flux'])
+
+        boundary_values = None
+
+        if config['BOUNDARY_VALUES']['type'] == 'uniform':
+
+            boundary_values = tuple(float(config['BOUNDARY_VALUES']['value'])
+                                    for m in range(self.n_ord))
+
+        elif config['BOUNDARY_VALUES']['type'] == 'inc_west':
+
+            boundary_values = (config.getfloat('BOUNDARY_VALUES', 'value'),
+                               *[0.0 for m in range(self.n_ord - 1)])
+
+        elif config['BOUNDARY_VALUES']['type'] == 'manual':
+
+            boundary_values = tuple(
+                map(float,
+                    config['BOUNDARY_VALUES']['valArray'].strip().split(',')))
+
+        else:
+
+            n_bndry_val = len(list(
+                map(float,
+                    config['BOUNDARY_VALUES']['valArray'].strip().split(','))))
+
+            sys.exit('Option \'manual\' was chosen for the boundary\n' +
+                     'values. Provided number of boundary values (' +
+                     str(n_bndry_val) + ')\ndid not match provided number' +
+                     'of discrete ordinates, which is ' + str(self.n_ord) +
+                     '.')
+
+        method = str(config['DISCRETIZATION']['method'])
+        quad_method = str(config['DISCRETIZATION']['quadrature'])
 
         solver_name = str(config['SOLVER']['solver'])
         assert solver_name in ['SparseDirect', 'GMRES', 'BiCGSTAB'], \
@@ -74,32 +126,39 @@ class RadiativeTransfer:
         self.outputType = str(config['OUTPUT']['type'])
 
         # define model problem and discretization
-        model_problem = modelProblem.ModelProblem(
-            dimension, temperature, frequency, albedo, emissivity, scattering,
-            absorption_coeff.abs_fun, boundary_values)
+        self.model_problem = modelProblem.ModelProblem(
+            temperature, frequency, albedo, emissivity, scattering,
+            absorption_coeff.abs_fun)
 
-        self.mesh = mesh.UniformMesh(domain, n_cells)
+        # time mesh generation
+        start_time = timeit.default_timer()
+        self.mesh = mesh.UniformMesh(dimension, domain, n_cells)
+        elapsed_time = timeit.default_timer() - start_time
+        mesh_time = elapsed_time
 
-        assert(self.method == 'finiteVolume')
+        assert(method == 'finiteVolume')
 
         # time matrix and load vector assembly
         start_time = timeit.default_timer()
 
         if scattering == 'isotropic':
 
-            disc = discretization.FiniteVolume1d(
-                model_problem, self.mesh, n_ordinates, quadrature_weights,
-                flux)
+            disc = discretization.FiniteVolume(
+                self.model_problem, self.mesh, self.n_ord, boundary_values,
+                flux, quad_method)
 
         else:
 
-            disc = discretization.FiniteVolume1d(
-                model_problem, self.mesh, n_ordinates, quadrature_weights,
-                flux)
+            disc = discretization.FiniteVolume(
+                self.model_problem, self.mesh, self.n_ord, boundary_values,
+                flux, quad_method)
 
         elapsed_time = timeit.default_timer() - start_time
+
         print('Timings:')
         print('--------')
+        print('Mesh generation: ' +
+              "% 10.3e" % (mesh_time) + ' s')
         print('Matrix and rhs assembly: ' +
               "% 10.3e" % (elapsed_time) + ' s')
 
@@ -122,20 +181,42 @@ class RadiativeTransfer:
 
             if initial_guess == "thermalEmission":
 
-                x_in = np.full(disc.n_dof, model_problem.s_e)
+                alpha_tiled = np.ravel(
+                    np.tile(disc.alpha, reps=(1, self.n_ord)))
+
+                x_in = self.model_problem.emiss * self.model_problem.s_e * \
+                    alpha_tiled
 
             elif initial_guess == "noScattering":
 
-                sol1 = model_problem.inflow_bc[0] * \
-                    np.exp(-self.mesh.cell_centers()) + model_problem.s_e * \
-                    (1 - np.exp(-self.mesh.cell_centers()))
+                if self.mesh.dim == 1:
 
-                sol2 = model_problem.inflow_bc[1] * \
-                    np.exp(-self.mesh.cell_centers()[::-1]) + \
-                    model_problem.s_e * \
-                    (1 - np.exp(-self.mesh.cell_centers()[::-1]))
+                    sol1 = disc.inflow_bc[0] * \
+                        np.exp(-self.mesh.cell_centers()) + \
+                        self.model_problem.s_e * \
+                        (1 - np.exp(-self.mesh.cell_centers()))
 
-                x_in = np.concatenate((sol1, sol2), axis=0)
+                    sol2 = disc.inflow_bc[1] * \
+                        np.exp(-self.mesh.cell_centers()[::-1]) + \
+                        self.model_problem.s_e * \
+                        (1 - np.exp(-self.mesh.cell_centers()[::-1]))
+
+                    x_in = np.concatenate((sol1, sol2), axis=0)
+
+                else:
+
+                    # create model problem without scattering
+                    ns_mp = self.model_problem
+                    ns_mp.scat = 'none'
+
+                    ns_disc = discretization.FiniteVolume(
+                        ns_mp, self.mesh, self.n_ord, boundary_values, flux,
+                        quad_method, False)
+
+                    # one step of lambda iteration
+                    x_in = solver.invert_transport(ns_disc.stiff_mat,
+                                                   ns_disc.load_vec,
+                                                   self.n_ord)
 
             else:
 
@@ -149,39 +230,17 @@ class RadiativeTransfer:
 
         linear_solver = solver.Solver(solver_name, prec)
 
-        self.x, self.iters, self.elapsed_time = linear_solver.solve(A, b, x_in)
+        self.sol = linear_solver.solve(A, b, x_in)[0]
 
-    def output_results(self):
+    def visualize(self):
 
-        if self.outputType == "firstOrdinate":
-
-            if self.method == "finiteVolume":
-
-                plt.step(self.mesh.cell_centers(), self.x[:self.mesh.n_cells])
-
-            else:
-
-                plt.plot(self.mesh.cell_centers(), self.x[:self.mesh.n_cells])
-
-        elif self.outputType == "meanIntensity":
-
-            if self.method == "finiteVolume":
-
-                plt.step(self.mesh.cell_centers(), np.mean(
-                    (self.x[self.mesh.n_cells:], self.x[:self.mesh.n_cells]),
-                    axis=0))
-
-            else:
-
-                plt.plot(self.mesh.cell_centers(), np.mean(
-                    (self.x[self.mesh.n_cells:], self.x[:self.mesh.n_cells]),
-                    axis=0))
-
-        plt.show()
+        visualization.visualize(
+            self.sol, self.model_problem.abs_fun, self.mesh, self.n_ord,
+            self.outputType)
 
 
 if __name__ == "__main__":
 
     radtrans = RadiativeTransfer()
     radtrans.main(sys.argv)
-    radtrans.output_results()
+    radtrans.visualize()

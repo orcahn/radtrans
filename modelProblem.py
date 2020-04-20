@@ -15,8 +15,6 @@ class ModelProblem:
 
     Attributes
     ----------
-    dim : integer
-        The dimension of the domain.
     alb : float
         Albedo of the medium.
     emiss : float
@@ -33,21 +31,16 @@ class ModelProblem:
         alpha_scat = xi * alpha_abs.
     xip1 : float
         The value of xi + 1.0, stored for conveniency.
-    inflow_bc : tuple of length 2
-        Boundary conditions for the inflow boundaries of the corresponding
-        discrete ordinates.
     s_e : float
         Value of the dimensionless planck function for given frequency of
         radiation and temperature of medium.
     """
 
-    def __init__(self, dimension, temperature, frequency, albedo, emissivity,
-                 scattering, absorption_fun, inflow_bc):
+    def __init__(self, temperature, frequency, albedo, emissivity,
+                 scattering, absorption_fun):
         """
         Parameters
         ----------
-        dimension : integer
-            The dimension of the domain
         temperature : float
             Temperature of the medium, measured in Kelvin. It is assumed
             to be constant on the timescale of interest.
@@ -62,17 +55,7 @@ class ModelProblem:
             Type of scattering process assumed for the medium
         absorption_fun : callable
             Absorption coefficient assumed for the medium.
-        inflow_bc : tuple of length 2
-            Boundary conditions for the inflow boundaries of the corresponding
-            discrete ordinates. In one dimension there are exactly two
-            ordinates.
         """
-
-        assert dimension in [1, 2], \
-            'Dimension ' + dimension + ' of the domain is not supported. ' + \
-            'Currently only 1 and 2 dimensions are supported.'
-        self.dim = dimension
-
         self.s_e = 0
 
         e_ratio = (natConstSI.h_pla * frequency) / \
@@ -100,17 +83,11 @@ class ModelProblem:
             ' in the domain as argument.'
         self.abs_fun = absorption_fun
 
-        assert len(inflow_bc) == 2, \
-            'Invalid inflow boundary conditions.' + \
-            'For a 1d problem there must be exactly 2 conditions.'
-        self.inflow_bc = inflow_bc
-
         print('\n\nModel problem:\n' +
               '--------------\n' +
-              '    - dimension: 1\n' +
               '    - temperature: ' + str(temperature) + ' K\n' +
               '    - frequency: ' + str(frequency/1e12) + ' THz\n' +
               '    - s_e: ' + str(self.s_e) + '\n' +
               '    - albedo: ' + str(albedo) + '\n' +
               '    - emissivity: ' + str(emissivity) + '\n' +
-              '    - isotropic scattering\n\n')
+              '    - scattering: ' + scattering + '\n\n')

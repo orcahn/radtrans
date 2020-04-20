@@ -11,214 +11,370 @@ class Direction(IntEnum):
     S = 3       # south
 
 
-def midpoint(a, b, fun, h):
+def quadrature(fun, w, qn):
+    """
+    General quadrature in one or two dimensions
 
-    return h * fun(0.5 * (a + b))
+    Parameters
+    ----------
+    fun : callable
+        The function to be integrated
+    w : list of lists of floats
+        Quadrature weights. First entry corresponds to a quadrature node,
+        second entry to a dimension.
+    qn : list of lists of floats
+        Quadrature nodes. First entry corresponds to a node, second to
+        a dimension.
 
+    Returns
+    float
+        The integral of fun over the domain implied by the quadrature nodes.
+    """
 
-def trapezoidal(a, b, fun, h):
+    integral = 0.0
 
-    return 0.5 * h * (fun(a) + fun(b))
+    for q in range(len(w)):
+        for p in range(len(w)):
+            integral += w[q][0] * w[p][1] * fun([qn[q][0], qn[p][1]])
+
+    return integral
 
 
 class UniformMesh:
     """
-    Uniform mesh in 1 dimension
+    Uniform mesh in 1 or 2 dimensions
 
     Attributes
     ----------
-    dom_len : float
-        Length of the one-dimensional domain. The domain itself is then
-        defined as D = (0, dom_len).
-    n_cells : integer
-        Total number of cells the domain is partitioned into
-    h : float
-        Length of a single cell.
-    outer_normal : {mesh.Direction: np.ndarray} dict
+    dim : integer
+        The dimension of the domain.
+    dom_len : tuple of floats
+        Length of the domain along each dimension
+    outer_normal : <mesh.Direction: np.ndarray> dictionary
         Outer normals to corresponding directions
+    n_cells : tuple of integers
+        tuple indicating the number of cells along each dimension.
+    n_tot : integer
+        Total number of cells the domain is partitioned into.
+    h : tuple of floats
+        Length of a single cell along each dimension
+    grid : numpy.meshgrid
+        Cartesian Coordinates of the gridpoints.
 
     Methods
     -------
+    __integrate_cellwise__1d__(abs_fun, quad_method)
+        Compute the L2 scalar product of a function with the basis functions
+        corresponding to each cell in one dimension.
+    __integrate_cellwise__2d__(abs_fun, quad_method)
+        Compute the L2 scalar product of a function with the basis functions
+        corresponding to each cell in two dimensions.
     integrate_cellwise(abs_fun, quad_method)
         Compute the L2 scalar product of a function with the basis functions
         corresponding to each cell.
-    inflow_boundary_cells(ord_index)
-        Compute the cells with part on the inflow boundary of specific ordinate
-    is_outflow_boundary_cell(cell, ord_index)
-        Test for a cell to have part on the outflow boundary of specific
-        ordinate
-    boundary_cells(direction)
-        Compute the cells with part on the domain boundary in specific
-        direction
     interior_cells()
-        Compute indices of the interior cells
-    cell_centers()
-        Compute the coordinates of the cell centers
+        Compute the indices of the interior cells
+    boundary_cells(direction)
+        Compute the indices of the cells with part on the domain boundary
+        in a given direction. Corner cells are excluded.
+    cell_centers_1d()
+        Compute the cell centers for a one dimensional mesh.
+    south_west_corner()
+        Compute index of the cell in the south west corner of the mesh
+    south_east_corner()
+        Compute index of the cell in the south east corner of the mesh
+    north_west_corner()
+        Compute index of the cell in the north west corner of the mesh
+    north_east_corner()
+        Compute index of the cell in the north east corner of the mesh
     """
 
-    def __init__(self, domain_length, n_cells):
+    def __init__(self, dimension, domain_length, n_cells):
         """
         Parameters
         ----------
-        domain_length : float
-            Length of the one-dimensional domain
-        n_cells : integer
-            Number of cells
+        dimension : integer
+            The dimension of the domain
+        domain_length : tuple of floats
+            Length of the domain along each dimension
+        n_cells : tuple of integers
+            Number of cells along each dimension
         """
 
-        self.dom_len = domain_length
-        self.n_cells = n_cells
-        self.h = domain_length / float(n_cells)
+        assert dimension in [1, 2], \
+            'Dimension ' + dimension + ' of the domain is not supported. ' + \
+            'Currently only 1 and 2 dimensions are supported.'
+        self.dim = dimension
 
-        # Outer normal vectors
-        self.outer_normal = {Direction.E: np.array([1.0]),
-                             Direction.W: np.array([-1.0])}
+        for length in domain_length:
+            assert length > 0.0, 'Invalid domain length. Must be positive'
+        self.dom_len = domain_length[:dimension]
+
+        domain_str = '(0.0, ' + str(domain_length[0]) + ')'
+        for d in range(dimension - 1):
+            domain_str += ' x (0.0, ' + str(domain_length[d + 1]) + ')'
+
+        self.outer_normal = None
+        self.n_cells = None
+        self.h = None
+
+        if dimension == 1:
+
+            self.outer_normal = {Direction.E: np.array([1.0]),
+                                 Direction.N: np.array([0.0]),
+                                 Direction.W: np.array([-1.0]),
+                                 Direction.S: np.array([0.0])}
+
+            self.n_cells = (n_cells[0], 1)
+
+            # this is a hack for discretization in 1 dimension to
+            # work properly. In this case h does not have the
+            # meaning of mesh size.
+            self.h = (0.0, 1.0)
+
+        else:
+
+            self.outer_normal = {Direction.E: np.array([1.0, 0.0]),
+                                 Direction.N: np.array([0.0, 1.0]),
+                                 Direction.W: np.array([-1.0, 0.0]),
+                                 Direction.S: np.array([0.0, -1.0])}
+
+            self.n_cells = n_cells[:dimension]
+
+            self.h = tuple(
+                map(lambda a, b: a / float(b), self.dom_len, self.n_cells))
+
+        # compute total number of cells
+        self.n_tot = 1
+        for nc in self.n_cells:
+            self.n_tot *= nc
+
+        # i-th x-coordinate is given by entry [i, 0] in first tuple entry.
+        # j-th y-coordinate is given by entry [0, j] in second tuple entry.
+        self.grid = np.meshgrid(
+            *[np.linspace(0.0, self.dom_len[n],
+                          num=self.n_cells[n] + 1, endpoint=True)
+              for n in range(dimension)],
+            indexing='xy', sparse=True, copy=False)
 
         print('Mesh:\n' +
               '-----\n' +
-              '    - domain: (0.0, ' + str(domain_length) + ')\n' +
-              '    - number of cells: ' + str(n_cells) +
+              '    - dimension: ' + str(dimension) + '\n' +
+              '    - domain: ' + domain_str + '\n' +
+              '    - cells per dimension: ' + str(self.n_cells) + '\n' +
+              '    - total number of cells: ' + str(self.n_tot) + '\n' +
+              '    - mesh size per dimension: ' + str(self.h) +
               '\n\n')
 
-    def integrate_cellwise(self, abs_fun, quad_method):
+    def __integrate_cellwise_1d__(self, abs_fun, quad_method):
         """
-        Compute the L2 scalar product of a function with the basis functions
-        corresponding to each cell.
+        Computes the L2 scalar product of a function with the basis functions
+        corresponding to each cell in one dimension.
 
         Parameters
         ----------
-        fun : callable
-            The function to be used as argument in the scalar product
+        abs_fun : callable
+            The absorption function of the model problem
         quad_method : string
-            Specifies which quadrature method to use in the computation of
-            the scalar product.
+            The quadrature method to be used
 
         Returns
         -------
-        np.ndarray of shape (n_cells,)
-            Array with same number of entries as there are cells. Each entry k
-            corresponds to the L2 scalar product of fun with basis function k.
+        numpy.ndarray
+            An array, where each entry is given by the integral of the
+            absorption coefficient over the cell with according index.
         """
 
         # In a typical application, cell sizes are so small that low order
         # quadrature is of acceptable accuracy. Tests showed, that higher order
         # methods did not significantly improve accuracy, but imposed a
         # high performance overhead.
-        quadrature_fun = None
-
         if quad_method == 'midpoint':
-            def quadrature_fun(a, b): return midpoint(a, b, abs_fun, self.h)
+
+            def quadrature(a, b, fun, h):
+
+                return h * fun([0.5 * (a + b)])
+
         else:
-            def quadrature_fun(a, b): return trapezoidal(a, b, abs_fun, self.h)
 
-        boundaries = np.linspace(0.0, self.dom_len, num=self.n_cells + 1,
-                                 endpoint=True, retstep=False)
+            def quadrature(a, b, fun, h):
 
-        return np.array([quadrature_fun(boundaries[i], boundaries[i + 1])
-                         for i in range(self.n_cells)])
+                return 0.5 * h * (fun([a]) + fun([b]))
 
-    def inflow_boundary_cells(self, ord_index):
+        def q_fun(a, b): return quadrature(a, b, abs_fun,
+                                           self.dom_len[0] / self.n_cells[0])
+
+        return np.array([q_fun(self.grid[0][i], self.grid[0][i+1])
+                         for i in range(self.n_cells[0])])
+
+    def __integrate_cellwise_2d__(self, abs_fun, quad_method):
         """
-        List of all cell indices corresponding to a cell, which has at
-        least one face on the inflow boundary of ordinate ord_index.
+        Computes the L2 scalar product of a function with the basis functions
+        corresponding to each cell in a two dimensional mesh.
 
         Parameters
         ----------
-        ord_index : integer
-            Index of the desired ordinate
+        abs_fun : callable
+            The absorption function of the model problem
+        quad_method : string
+            The quadrature method to be used
 
         Returns
         -------
-        list of integers
-            List of the indices of the cells with part in the
-            inflow boundary of ord_index
+        numpy.ndarray
+            An array, where each entry is given by the integral of the
+            absorption coefficient over the cell with according index.
         """
 
-        if ord_index == 0:
+        # In a typical application, cell sizes are so small that low order
+        # quadrature is of acceptable accuracy. Tests showed, that higher order
+        # methods did not significantly improve accuracy, but imposed a
+        # high performance overhead.
+        if quad_method == 'midpoint':
 
-            return [0]
+            weights = [[self.h[0], self.h[1]]]
 
-        elif ord_index == 1:
+            def nodes(cell):
 
-            return [-1]
+                # 2d indices of global indexing of cell
+                i = cell % self.n_cells[0]
+                j = (cell - i) // self.n_cells[0]
 
-        else:
-            raise Exception('Invalid ordinate index')
+                return [[0.5 * (self.grid[0][0, i] +
+                                self.grid[0][0, i+1]),
+                         0.5 * (self.grid[1][j, 0] +
+                                self.grid[1][j+1, 0])]]
 
-    def is_outflow_boundary_cell(self, cell, ord_index):
+        else:   # quad_method == 'trapezoidal'
+
+            weights = [2 * [0.5 * self.h[0], 0.5 * self.h[1]]]
+
+            def nodes(cell):
+
+                # 2d indices of global indexing of cell
+                i = cell % self.n_cells[0]
+                j = (cell - i) // self.n_cells[0]
+
+                return [[self.grid[0][0, i],
+                         self.grid[1][j, 0]],
+                        [self.grid[0][0, i+1],
+                         self.grid[1][j+1, 0]]]
+
+        def q_fun(cell): return quadrature(abs_fun, weights, nodes(cell))
+
+        return np.array([q_fun(cell) for cell in range(self.n_tot)])
+
+    def integrate_cellwise(self, abs_fun, quad_method):
         """
-        Test for a cell to be part of the outflow boundary
+        Computes the L2 scalar product of a function with the basis functions
+        corresponding to each cell for the given mesh.
 
         Parameters
         ----------
-        cell : integer
-            Index of the cell to be tested
-        ord_index : integer
-            Index of the desired ordinate
+        abs_fun : callable
+            The absorption function of the model problem
+        quad_method : string
+            The quadrature method to be used
 
         Returns
         -------
-        bool
-            True if cell has a part on the outflow boundary of ordinate
-            ord_index, False otherwise.
+        numpy.ndarray
+            An array, where each entry is given by the integral of the
+            absorption coefficient over the cell with according index.
         """
 
-        if ord_index == 0:
+        if self.dim == 1:
+            return self.__integrate_cellwise_1d__(abs_fun, quad_method)
+        else:
+            return self.__integrate_cellwise_2d__(abs_fun, quad_method)
 
-            if cell == self.n_cells - 1:
-                return True
+    def interior_cells(self):
+        """
+        Computes the indices of the interior cells of the mesh
 
-            else:
-                return False
+        Returns
+        -------
+        numpy.ndarray
+            An array with the indices of the interior cells
+        """
 
-        elif ord_index == 1:
+        # start with the lowest interior row
+        interior_row = np.arange(self.n_cells[0] + 1, 2 * self.n_cells[0] - 1)
+        interior_indices = interior_row
 
-            if cell == 0:
-                return True
+        if self.dim == 1:
 
-            else:
-                return False
+            return np.add(interior_indices, -self.n_cells[0])
+
+        else:
+
+            for row in range(self.n_cells[1] - 3):
+
+                # get indices of row above
+                interior_row = np.add(interior_row, self.n_cells[0])
+
+                # append to array storing all indices
+                interior_indices = np.concatenate(
+                    (interior_indices, interior_row))
+
+            return interior_indices
 
     def boundary_cells(self, direction):
         """
-        Cells with part on the domain boudary in a certain direction
+        Computes the indices of the cells with at least one face on the domain
+        boundary in a given direction.
 
         Parameters
         ----------
         direction : mesh.Direction
-            Direction, indicating the boudary
+            The direction of the domain boundary that is of interest
 
         Returns
         -------
-        range
-            Range of indices of the cells with part on the boundary
-            specified by the direction.
+        numpy.ndarray
+            An array with the indices of the boundary cells
         """
 
         if direction == Direction.E:
-            return range(self.n_cells - 1, self.n_cells)
+
+            if self.dim == 1:
+                return np.array([self.n_cells[0] - 1])
+            else:
+                return np.arange(start=2 * self.n_cells[0] - 1,
+                                 stop=self.n_tot - 1,
+                                 step=self.n_cells[0])
+
+        elif direction == Direction.N:
+
+            if self.dim == 1:
+                return np.array([])
+            else:
+                return np.arange(
+                    start=(self.n_cells[1] - 1) * self.n_cells[0] + 1,
+                    stop=self.n_tot - 1)
 
         elif direction == Direction.W:
-            return range(1)
+
+            if self.dim == 1:
+                return np.array([0])
+            else:
+                return np.arange(start=self.n_cells[0],
+                                 stop=(self.n_cells[1] - 1) * self.n_cells[0],
+                                 step=self.n_cells[0])
+
+        elif direction == Direction.S:
+
+            if self.dim == 1:
+                return np.array([])
+            else:
+                return np.arange(start=1, stop=self.n_cells[0] - 1)
 
         else:
-            return range(0)
+            raise Exception('Unknown direction ' + str(direction))
 
-    def interior_cells(self):
+    def cell_centers_1d(self):
         """
-        Indices of the interior cells
-
-        Returns
-        -------
-        range
-            Range of indices of the interior cells of the domain.
-        """
-
-        return range(1, self.n_cells - 1)
-
-    def cell_centers(self):
-        """
-        Coordinates of the cell centers
+        Coordinates of the cell centers in a one-dimensional mesh
 
         Returns
         -------
@@ -227,4 +383,60 @@ class UniformMesh:
             indexing as for the corresponding cell indices.
         """
 
-        return np.arange(0.5 * self.h, self.n_cells * self.h, self.h)
+        if self.dim == 1:
+
+            h = self.dom_len[0] / self.n_cells[0]
+
+            return np.arange(0.5 * h, self.n_cells[0] * h, h)
+
+        else:
+
+            raise Exception('cell_centers_1d() only works for in 1 dimension')
+
+    def south_west_corner(self):
+        """
+        Computes the index of the cell in the south western corner of the mesh.
+
+        Returns
+        -------
+        integer
+            index of the south western corner cell.
+        """
+
+        return 0
+
+    def south_east_corner(self):
+        """
+        Computes the index of the cell in the south eastern corner of the mesh.
+
+        Returns
+        -------
+        integer
+            index of the south eastern corner cell.
+        """
+
+        return self.n_cells[0] - 1
+
+    def north_west_corner(self):
+        """
+        Computes the index of the cell in the north western corner of the mesh.
+
+        Returns
+        -------
+        integer
+            index of the north western corner cell.
+        """
+
+        return (self.n_cells[1] - 1) * self.n_cells[0]
+
+    def north_east_corner(self):
+        """
+        Computes the index of the cell in the north eastern corner of the mesh.
+
+        Returns
+        -------
+        integer
+            index of the north eastern corner cell.
+        """
+
+        return self.n_tot - 1

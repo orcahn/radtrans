@@ -181,11 +181,7 @@ class RadiativeTransfer:
 
             if initial_guess == "thermalEmission":
 
-                alpha_tiled = np.ravel(
-                    np.tile(disc.alpha, reps=(1, self.n_ord)))
-
-                x_in = self.model_problem.emiss * self.model_problem.s_e * \
-                    alpha_tiled
+                x_in = disc.load_vec
 
             elif initial_guess == "noScattering":
 

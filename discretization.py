@@ -68,9 +68,6 @@ class FiniteVolume:
         Total number of degrees of freedom in the complete system.
     n_ord : integer
         Total number of discrete ordinates.
-    alpha : one dimensional numpy.ndarray
-        The integrals of the absorption coefficient over the cells of the
-        mesh.
     stiff_mat : scipy.sparse.csr.csr_matrix
         Sparse stiffness matrix of the system.
     lambda_prec : scipy.sparse.csr.csr_matrix
@@ -194,14 +191,14 @@ class FiniteVolume:
         #                           ASSEMBLY
         # --------------------------------------------------------------------
 
-        self.alpha = mesh.integrate_cellwise(mp.abs_fun, quadrature)
+        alpha = mesh.integrate_cellwise(mp.abs_fun, quadrature)
 
         # assembly of the discretized transport term
         t_mat = self.__assemble_transport__(
             mesh, n_dot_n, ord_dir, numerical_flux)
 
         # assembly of the discretized absorption term
-        a_mat = self.__assemble_absorption__(mp.xip1)
+        a_mat = self.__assemble_absorption__(alpha, mp.xip1)
 
         if mp.scat == 'none':
 
@@ -219,7 +216,7 @@ class FiniteVolume:
         else:
 
             # assembly of the discretized scattering terms
-            s_mat = self.__assemble_scattering__(sig, mp.xi)
+            s_mat = self.__assemble_scattering__(alpha, sig, mp.xi)
 
             # Combine transport and absorption parts. By default
             # when converting to CSR or CSC format, duplicate
@@ -238,7 +235,7 @@ class FiniteVolume:
 
             self.lambda_prec = self.lambda_prec.tocsr()
 
-        self.load_vec = self.__assemble_source__(mp, mesh, n_dot_n)
+        self.load_vec = self.__assemble_source__(mp, mesh, alpha, n_dot_n)
 
     def __compute_scalar_product__(self, outer_normals, ord_dir):
         """
@@ -514,13 +511,16 @@ class FiniteVolume:
 
         return sps.block_diag(block_diag)
 
-    def __assemble_absorption__(self, xip1):
+    def __assemble_absorption__(self, alpha, xip1):
         """
         Assembles the matrix corresponding to the absorption term in sparse
         coordinate format.
 
         Parameters
         ----------
+        alpha : one dimensional numpy.ndarray
+            The integrals of the absorption coefficient over the cells of the
+            mesh.
         xip1 : float
             The ratio between scattering coefficient and absorption coefficient
             plus 1.0.
@@ -534,7 +534,7 @@ class FiniteVolume:
         """
 
         alpha_tiled = xip1 * \
-            np.ravel(np.tile(self.alpha, reps=(1, self.n_ord)))
+            np.ravel(np.tile(alpha, reps=(1, self.n_ord)))
 
         # for the pure absorption part, there is neither a coupling between
         # neighbouring cells nor between different ordinates. The resulting
@@ -542,13 +542,16 @@ class FiniteVolume:
         return sps.diags(alpha_tiled, format='coo',
                          shape=(self.n_dof, self.n_dof))
 
-    def __assemble_scattering__(self, sig, xi):
+    def __assemble_scattering__(self, alpha, sig, xi):
         """
         Assembles the matrix corresponding to the scattering term in sparse
         coordinate format.
 
         Parameters
         ----------
+        alpha : one dimensional numpy.ndarray
+        The integrals of the absorption coefficient over the cells of the
+        mesh.
         xip1 : float
             The ratio between scattering coefficient and absorption coefficient
             plus 1.0.
@@ -573,13 +576,13 @@ class FiniteVolume:
 
             for n in range(self.n_ord):
                 block_row += [sps.diags(-xi * sig[m, n]
-                                        * np.ravel(self.alpha), format='coo')]
+                                        * np.ravel(alpha), format='coo')]
 
             blocks += [block_row]
 
         return sps.bmat(blocks, format='coo')
 
-    def __assemble_source__(self, mp, mesh, n_dot_n):
+    def __assemble_source__(self, mp, mesh, alpha, n_dot_n):
         """
         Assembles the load vector corresponding to the source terms.
 
@@ -589,6 +592,9 @@ class FiniteVolume:
             Radiative Transfer problem to be discretized
         mesh : mesh.UniformMesh
             Uniform mesh used for the FV discretization.
+        alpha : one dimensional numpy.ndarray
+            The integrals of the absorption coefficient over the cells of the
+            mesh.
         n_dot_n : <mesh.Direction : list of floats> dictionary
             Dictionary containing all the relevant scala products, as returned
             by __compute_scalar_products__.
@@ -599,7 +605,7 @@ class FiniteVolume:
             Load vector of the system
         """
 
-        alpha_tiled = np.ravel(np.tile(self.alpha, reps=(1, self.n_ord)))
+        alpha_tiled = np.ravel(np.tile(alpha, reps=(1, self.n_ord)))
         load_vec = mp.emiss * mp.s_e * alpha_tiled
 
         # add boundary conditions

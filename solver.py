@@ -37,7 +37,7 @@ def invert_transport(M, x, n_ord):
 
         prec_vec = np.empty(x.size)
 
-        # invert the nc x nc diagonal blocks
+        # Invert the nc x nc diagonal blocks
         for m in range(n_ord):
             prec_vec[m * nc: (m + 1) * nc] = spsla.spsolve(
                 M[m * nc: (m + 1) * nc, m * nc: (m + 1) * nc],

@@ -3,26 +3,26 @@ import numpy as np
 from numpy.linalg import norm
 
 
-# test case: no absorption
+# Test case: no absorption
 def no_abs(x):
 
     return 0.0
 
 
-# constant absorption throughout the domain. Recovers the case of
+# Constant absorption throughout the domain. Recovers the case of
 # homogeneous medium in the domain
 def const_abs(x):
 
     return 1.0
 
 
-# positive gradient from 0.0 at 0 to 1.0 at L
+# Positive gradient from 0.0 at 0 to 1.0 at L
 def pos_grad_abs(x, L):
 
     return x[0] / L[0]
 
 
-# gaussian with stddev 1.0, centered at L/2
+# Gaussian with stddev 1.0, centered at L/2
 def gaussian_abs(x, L):
 
     res = np.exp(-0.5 * (x[0] - 0.5 * L[0]) *
@@ -36,7 +36,7 @@ def gaussian_abs(x, L):
     return res
 
 
-# discontinuous absorption coefficient
+# Discontinuous absorption coefficient
 def step_abs(x, L):
 
     dist = [x[d] - L[d] / 2.0 for d in range(len(x))]
@@ -46,18 +46,18 @@ def step_abs(x, L):
         return 0.0
 
 
-# piecewise constant absorption with random values
+# Piecewise constant absorption with random values
 # following a gaussian distribution
 def gaussian_random_piecewise(x, constants, L):
 
     if len(x) == 1:
 
         h = L[0] / 10.
-        bool_array1 = [x >= h * i for i in range(len(constants))]
-        bool_array2 = [x < h * (i + 1) for i in range(len(constants))]
+        bool_array1 = [x[0] >= h * i for i in range(len(constants))]
+        bool_array2 = [x[0] < h * (i + 1) for i in range(len(constants))]
 
         return np.piecewise(
-            x, np.logical_and(bool_array1, bool_array2), constants)
+            x[0], np.logical_and(bool_array1, bool_array2), constants)
 
     else:
 

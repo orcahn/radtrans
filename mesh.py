@@ -386,12 +386,30 @@ class UniformMesh:
         if self.dim == 1:
 
             h = self.dom_len[0] / self.n_cells[0]
-
             return np.arange(0.5 * h, self.n_cells[0] * h, h)
 
         else:
 
             raise Exception('cell_centers_1d() only works for in 1 dimension')
+
+    def cell_centers_2d(self):
+        """
+        Coordinates of the cell centers in a two-dimensional mesh
+
+        Returns
+        -------
+        np.ndarray
+            Array containing the coordinates of the cell centers with the same
+            indexing as for the corresponding cell indices.
+        """
+
+        x_centers = np.arange(
+            0.5 * self.h[0], self.n_cells[0] * self.h[0], self.h[0])
+        y_centers = np.arange(
+            0.5 * self.h[1], self.n_cells[1] * self.h[1], self.h[1])
+        
+        # centers as a list of points
+        return np.transpose([np.tile(x_centers, len(y_centers)), np.repeat(y_centers, len(x_centers))])
 
     def south_west_corner(self):
         """

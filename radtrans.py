@@ -200,7 +200,7 @@ class RadiativeTransfer:
                     if flux == 'diffusion':
 
                         x_in = np.mean((sol1, sol2), axis=0)
-                    
+
                     else:
 
                         x_in = np.concatenate((sol1, sol2), axis=0)

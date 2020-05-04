@@ -1,7 +1,7 @@
 # radtrans
 
-## Dependencies
+# Dependencies
 
-## Structure
+# Structure
 
-## Authors
+# Authors

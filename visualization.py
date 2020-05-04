@@ -33,9 +33,9 @@ def visualize(sol, abs_fun, mesh, n_ord, outputType):
         elif outputType == "meanIntensity":
 
             if len(sol) == mesh.n_cells[0] * mesh.n_cells[1]:
-                
+
                 z = sol
-            
+
             else:
 
                 z = np.mean((sol[-mesh.n_cells[0]:], sol[:mesh.n_cells[0]]),
@@ -114,13 +114,14 @@ def visualize(sol, abs_fun, mesh, n_ord, outputType):
             else:
 
                 z = sol.reshape((n_ord, mesh.n_tot), order='C')
-                z = np.mean(z, axis=0).reshape((mesh.n_cells[1], mesh.n_cells[0]))
+                z = np.mean(z, axis=0).reshape(
+                    (mesh.n_cells[1], mesh.n_cells[0]))
 
         elif outputType == "totalIntensity":
 
             z = sol.reshape((n_ord, mesh.n_tot), order='C')
             z = np.sum(z, axis=0).reshape((mesh.n_cells[1], mesh.n_cells[0]))
-            
+
         else:
 
             raise Exception('Unknown output type ' + outputType)

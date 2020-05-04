@@ -407,7 +407,7 @@ class UniformMesh:
             0.5 * self.h[0], self.n_cells[0] * self.h[0], self.h[0])
         y_centers = np.arange(
             0.5 * self.h[1], self.n_cells[1] * self.h[1], self.h[1])
-        
+
         # centers as a list of points
         return np.transpose([np.tile(x_centers, len(y_centers)), np.repeat(y_centers, len(x_centers))])
 

@@ -9,7 +9,7 @@ the discrete ordinates method with the option of solving a diffusion problem ins
 for high albedo values. Lambda iteration is an available preconditioner for the 
 linear systems, these being formulated sparsely for efficiency. Multiple interesting
 choices of non-constant absorption coefficients. The project is designed to seamlessly
-accomodate 1D and 2D problems; Anisotropic mesh sizes are supported in two dimensions.
+accomodate 1D and 2D problems; anisotropic mesh sizes are supported in two dimensions.
 # Dependencies
 
 # Structure

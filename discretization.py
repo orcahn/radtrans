@@ -92,6 +92,12 @@ class FiniteVolume:
         scattering term.
     __assemble_source__(mp, mesh, n_dot_n)
         Assembles the load vector corresponding to the source terms.
+    __assemble_diffusion__(smesh, abs_f, scattering, xip1, n_boundaries)
+        Assembles the matrix for the diffusion limit.
+    __assemble_dirichlet__(self, mesh, abs_f, xip1, n_boundaries)
+        Assembles the dirichlet boundary conditions for the diffusion
+        limit.
+
 
     Implementation Notes
     --------------------
@@ -132,32 +138,23 @@ class FiniteVolume:
                 'Invalid inflow boundary conditions. ' + \
                 'For a 1d problem there must be exactly 2 conditions.'
 
-        assert numerical_flux in ['upwind', 'centered'], \
+        assert numerical_flux in ['upwind', 'centered', 'diffusion'], \
             'Numerical flux ' + numerical_flux + ' not implemented.'
 
         assert quadrature in ['midpoint', 'trapezoidal'], \
             'Quadrature method ' + quadrature + ' not implemented.'
 
-        if output:
-            print('Discretization:\n' +
-                  '---------------\n' +
-                  '    - number of discrete ordinates: ' + str(n_ordinates) +
-                  '\n    - number of degrees of freedom: ' + str(self.n_dof) +
-                  '\n    - quadrature method: ' + quadrature + ' rule\n' +
-                  '    - numerical flux: ' + numerical_flux +
-                  '\n\n')
-
         # ---------------------------------------------------------------------
         #               DISCRETE ORDINATES AND SCATTERING
         # ---------------------------------------------------------------------
 
-        # list of directions of the discrete ordinates
+        # List of directions of the discrete ordinates
         if mesh.dim == 1:
             ord_dir = [np.array([1.0]), np.array([-1.0])]
 
         else:
 
-            # 'equidistant' on the unit circle
+            # 'Equidistant' on the unit circle
             piM = 2.0 * np.pi / float(n_ordinates)
 
             ord_dir = [np.array([np.cos(m * piM), np.sin(m * piM)])
@@ -165,77 +162,161 @@ class FiniteVolume:
 
         n_dot_n = self.__compute_scalar_product__(mesh.outer_normal, ord_dir)
 
-        # scattering coefficients for the chosen process
-        sig = np.empty((self.n_ord, self.n_ord))
-        do_weights = np.zeros(n_ordinates)
-        scat_prob = np.zeros(n_ordinates)
+        if numerical_flux == 'diffusion':
 
-        if mp.scat == 'isotropic':
+            self.n_dof = mesh.n_cells[0]*mesh.n_cells[1]
+            self.inflow_bc = inflow_bc
 
-            # ordinate weights could in principle be chosen arbitrarily,
-            # however we chose them such, that energy conservation is satisfied
-            if mesh.dim == 1:
-                do_weights = np.array([1.0, 1.0])
-                scat_prob = np.array([0.5, 0.5])
+            n_diri = np.count_nonzero(self.inflow_bc)
+
+            if mesh.dim == 2:
+
+                # If n_diri == 1, just set the eastern boundary
+                if n_diri != 1:
+                    n_diri = 4
+
+            if output:
+
+                print('Discretization:\n' +
+                      '---------------\n' +
+                      '\n    - number of degrees of freedom: ' + str(self.n_dof) +
+                      '\n    - quadrature method: ' + quadrature + ' rule\n' +
+                      '    - numerical flux: ' + numerical_flux +
+                      '\n\n')
+
+            # --------------------------------------------------------------------
+            #                           MATRIX ASSEMBLY
+            # --------------------------------------------------------------------
+
+            # Assembly of the discretized diffusion term
+            d_mat = self.__assemble_diffusion__(
+                mesh, mp.abs_fun, mp.scat, mp.xip1, n_diri)
+
+            # Assembly of the discretized absorption term.
+            # In the diffusion case, it does not contain the
+            # scattering coefficient, unlike the transport case.
+            alpha = mesh.integrate_cellwise(mp.abs_fun, quadrature)
+            a_mat = self.__assemble_absorption__(alpha, 1.0)
+
+            if mp.scat == 'none':
+
+                self.lambda_prec = sps.identity(self.n_dof)
+
+                # Combine diffusion and absorption parts. By default
+                # when converting to CSR or CSC format, duplicate
+                # (i,j) entries will be summed together
+                self.stiff_mat = sps.coo_matrix((
+                    np.concatenate((d_mat.data, a_mat.data)),
+                    (np.concatenate((d_mat.row, a_mat.row)),
+                     np.concatenate((d_mat.col, a_mat.col)))),
+                    shape=(self.n_dof, self.n_dof)).tocsr()
 
             else:
-                do_weights = np.full(n_ordinates,
-                                     2.0 * np.pi / float(n_ordinates))
-                scat_prob = np.full(n_ordinates, 0.5 / np.pi)
 
-        for i in range(self.n_ord):
-            for j in range(self.n_ord):
-                sig[i, j] = do_weights[i] * scat_prob[j]
+                # Combine diffusion and absorption parts. By default
+                # when converting to CSR or CSC format, duplicate
+                # (i,j) entries will be summed together
+                self.lambda_prec = sps.coo_matrix((
+                    np.concatenate((d_mat.data, a_mat.data)),
+                    (np.concatenate((d_mat.row, a_mat.row)),
+                     np.concatenate((d_mat.col, a_mat.col)))),
+                    shape=(self.n_dof, self.n_dof)).tocsr()
 
-        # --------------------------------------------------------------------
-        #                           ASSEMBLY
-        # --------------------------------------------------------------------
+                self.stiff_mat = self.lambda_prec
+            # --------------------------------------------------------------------
+            #                       LOAD VECTOR ASSEMBLY
+            # --------------------------------------------------------------------
 
-        alpha = mesh.integrate_cellwise(mp.abs_fun, quadrature)
+            # Assemble the vector of Dirichlet boundary conditions
+            diri_bc = self.__assemble_dirichlet__(
+                mesh, mp.abs_fun, mp.xip1, n_diri)
 
-        # assembly of the discretized transport term
-        t_mat = self.__assemble_transport__(
-            mesh, n_dot_n, ord_dir, numerical_flux)
-
-        # assembly of the discretized absorption term
-        a_mat = self.__assemble_absorption__(alpha, mp.xip1)
-
-        if mp.scat == 'none':
-
-            self.lambda_prec = sps.identity(self.n_dof)
-
-            # Combine transport and absorption parts. By default
-            # when converting to CSR or CSC format, duplicate
-            # (i,j) entries will be summed together
-            self.stiff_mat = sps.coo_matrix((
-                np.concatenate((t_mat.data, a_mat.data)),
-                (np.concatenate((t_mat.row, a_mat.row)),
-                 np.concatenate((t_mat.col, a_mat.col)))),
-                shape=(self.n_dof, self.n_dof)).tocsr()
+            # Assemble the load vector
+            self.load_vec = mp.emiss * mp.s_e * alpha + diri_bc
 
         else:
 
-            # assembly of the discretized scattering terms
-            s_mat = self.__assemble_scattering__(alpha, sig, mp.xi)
+            if output:
 
-            # Combine transport and absorption parts. By default
-            # when converting to CSR or CSC format, duplicate
-            # (i,j) entries will be summed together
-            self.lambda_prec = sps.coo_matrix((
-                np.concatenate((t_mat.data, a_mat.data)),
-                (np.concatenate((t_mat.row, a_mat.row)),
-                 np.concatenate((t_mat.col, a_mat.col)))),
-                shape=(self.n_dof, self.n_dof))
+                print('Discretization:\n' +
+                      '---------------\n' +
+                      '    - number of discrete ordinates: ' + str(n_ordinates) +
+                      '\n    - number of degrees of freedom: ' + str(self.n_dof) +
+                      '\n    - quadrature method: ' + quadrature + ' rule\n' +
+                      '    - numerical flux: ' + numerical_flux +
+                      '\n\n')
 
-            self.stiff_mat = sps.coo_matrix((
-                np.concatenate((self.lambda_prec.data, s_mat.data)),
-                (np.concatenate((self.lambda_prec.row, s_mat.row)),
-                 np.concatenate((self.lambda_prec.col, s_mat.col)))),
-                shape=(self.n_dof, self.n_dof)).tocsr()
+            # Scattering coefficients for the chosen process
+            sig = np.empty((self.n_ord, self.n_ord))
+            do_weights = np.zeros(n_ordinates)
+            scat_prob = np.zeros(n_ordinates)
 
-            self.lambda_prec = self.lambda_prec.tocsr()
+            if mp.scat == 'isotropic':
 
-        self.load_vec = self.__assemble_source__(mp, mesh, alpha, n_dot_n)
+                # Ordinate weights could in principle be chosen arbitrarily,
+                # however we chose them such, that energy conservation is satisfied
+                if mesh.dim == 1:
+                    do_weights = np.array([1.0, 1.0])
+                    scat_prob = np.array([0.5, 0.5])
+
+                else:
+                    do_weights = np.full(n_ordinates,
+                                         2.0 * np.pi / float(n_ordinates))
+                    scat_prob = np.full(n_ordinates, 0.5 / np.pi)
+
+            for i in range(self.n_ord):
+                for j in range(self.n_ord):
+                    sig[i, j] = do_weights[i] * scat_prob[j]
+
+            # --------------------------------------------------------------------
+            #                           ASSEMBLY
+            # --------------------------------------------------------------------
+
+            alpha = mesh.integrate_cellwise(mp.abs_fun, quadrature)
+
+            # Assembly of the discretized transport term
+            t_mat = self.__assemble_transport__(
+                mesh, n_dot_n, ord_dir, numerical_flux)
+
+            # Assembly of the discretized absorption term
+            a_mat = self.__assemble_absorption__(alpha, mp.xip1)
+
+            if mp.scat == 'none':
+
+                self.lambda_prec = sps.identity(self.n_dof)
+
+                # Combine transport and absorption parts. By default
+                # when converting to CSR or CSC format, duplicate
+                # (i,j) entries will be summed together
+                self.stiff_mat = sps.coo_matrix((
+                    np.concatenate((t_mat.data, a_mat.data)),
+                    (np.concatenate((t_mat.row, a_mat.row)),
+                     np.concatenate((t_mat.col, a_mat.col)))),
+                    shape=(self.n_dof, self.n_dof)).tocsr()
+
+            else:
+
+                # Assembly of the discretized scattering terms
+                s_mat = self.__assemble_scattering__(alpha, sig, mp.xi)
+
+                # Combine transport and absorption parts. By default
+                # when converting to CSR or CSC format, duplicate
+                # (i,j) entries will be summed together
+                self.lambda_prec = sps.coo_matrix((
+                    np.concatenate((t_mat.data, a_mat.data)),
+                    (np.concatenate((t_mat.row, a_mat.row)),
+                     np.concatenate((t_mat.col, a_mat.col)))),
+                    shape=(self.n_dof, self.n_dof))
+
+                self.stiff_mat = sps.coo_matrix((
+                    np.concatenate((self.lambda_prec.data, s_mat.data)),
+                    (np.concatenate((self.lambda_prec.row, s_mat.row)),
+                     np.concatenate((self.lambda_prec.col, s_mat.col)))),
+                    shape=(self.n_dof, self.n_dof)).tocsr()
+
+                self.lambda_prec = self.lambda_prec.tocsr()
+
+            self.load_vec = self.__assemble_source__(mp, mesh, alpha, n_dot_n)
 
     def __compute_scalar_product__(self, outer_normals, ord_dir):
         """
@@ -265,7 +346,7 @@ class FiniteVolume:
 
                 prod = np.dot(outer_normals[d], nm)
 
-                # even for 1e6 ordinate directions, the smallest absolute value
+                # Even for 1e6 ordinate directions, the smallest absolute value
                 # of a scalar product between ordinate and normal, is on the
                 # order 1e-6. Values smaller than 1e-12 are thus guaranteed to
                 # stem from errors in floating point calculations.
@@ -334,7 +415,7 @@ class FiniteVolume:
                 if n_list[m] > 0.0:
                     out_bndry += [d]
 
-            # scalar product of outer normals with ordinate direction m
+            # Scalar product of outer normals with ordinate direction m
             n_prod_E = n_dot_n[Dir.E][m]
             n_prod_N = n_dot_n[Dir.N][m]
             n_prod_W = -n_prod_E
@@ -346,7 +427,7 @@ class FiniteVolume:
 
             for i in mesh.interior_cells():
 
-                # within one ordinate, for the transport part there is only
+                # Within one ordinate, for the transport part there is only
                 # coupling between one cell and its direct neighbours in the
                 # four directions. This translates to 5 nonzero entries.
                 row += 5 * [i]
@@ -358,7 +439,7 @@ class FiniteVolume:
                          flux_minus(n_prod_N, h_h),
                          flux_plus(n_prod_N, h_h)]
 
-            # treat the corner cells separately
+            # Treat the corner cells separately
             if mesh.dim == 2:
 
                 sw_index = mesh.south_west_corner()
@@ -421,7 +502,7 @@ class FiniteVolume:
                     col += [se_index, sw_index]
                     data += 2 * [h_h * n_prod_S]
 
-            # the boundary cells excluding cells in the corners
+            # The boundary cells excluding cells in the corners
             for i in mesh.boundary_cells(Dir.E):
 
                 row += 4 * [i]
@@ -536,7 +617,7 @@ class FiniteVolume:
         alpha_tiled = xip1 * \
             np.ravel(np.tile(alpha, reps=(1, self.n_ord)))
 
-        # for the pure absorption part, there is neither a coupling between
+        # For the pure absorption part, there is neither a coupling between
         # neighbouring cells nor between different ordinates. The resulting
         # matrix is diagonal.
         return sps.diags(alpha_tiled, format='coo',
@@ -608,7 +689,7 @@ class FiniteVolume:
         alpha_tiled = np.ravel(np.tile(alpha, reps=(1, self.n_ord)))
         load_vec = mp.emiss * mp.s_e * alpha_tiled
 
-        # add boundary conditions
+        # Add boundary conditions
         for m in range(self.n_ord):
 
             in_bndry = []
@@ -664,3 +745,655 @@ class FiniteVolume:
                         mesh.h[0] * n_dot_n[Dir.S][m] * self.inflow_bc[m]
 
         return load_vec
+
+    def __assemble_diffusion__(self, mesh, abs_f, scattering, xip1, n_boundaries):
+        """
+        Assembles the diffusion matrix.
+
+        Parameters
+        ----------
+        mesh : mesh.UniformMesh
+            Uniform mesh used for the discretization.
+        abs_f : callable
+        Callable object, representing the absorption coefficient. 
+        Takes values in the domain as argument.
+        scattering : string
+        Type of scattering process assumed for the medium
+        xip1 : float
+        The ratio between scattering coefficient and absorption
+        coefficient plus 1.0.
+        alpha_scat = xi * alpha_abs.
+        n_boundaries : int
+        The number of Dirichlet boundaries.
+
+        Returns
+        -------
+        scipy.sparse.coo_matrix
+
+        Sparse matrix representing the discretized diffusion term in
+        coordinate format.
+        """
+
+        row = []
+        col = []
+        data = []
+
+        # Cut-off value for absorption coefficient
+        eps = 1.e-6
+
+        # Modified absorption function
+        def abs_fun(x):
+
+            if abs(abs_f(x)) < eps:
+
+                return eps
+
+            else:
+
+                return abs_f(x)
+
+        if mesh.dim == 1:
+
+            # Get the mesh size h
+            h = mesh.dom_len[0] / mesh.n_cells[0]
+
+            # Save cell centers for efficiency reasons
+            cell_centers = mesh.cell_centers_1d()
+
+            # Loop over boundary cells
+            for boundary in mesh.outer_normal:
+
+                for p in mesh.boundary_cells(boundary):
+
+                    if p == 0:
+
+                        row += 2 * [p]
+                        col += [p, p + 1]
+
+                        d_diri = 2. / h * 1. / \
+                            (xip1 * abs_fun([cell_centers[p]]))
+                        d_E = 2. / h * 1. / \
+                            (xip1 * (abs_fun([cell_centers[p + 1]]
+                                             ) + abs_fun([cell_centers[p]])))
+
+                        data += [d_diri + d_E, -d_E]
+
+                    if p == mesh.n_cells[0] - 1:
+
+                        row += 2 * [p]
+                        col += [p - 1, p]
+
+                        d_W = 2. / h * 1. / \
+                            (xip1 * (abs_fun([cell_centers[p - 1]]
+                                             ) + abs_fun([cell_centers[p]])))
+
+                        # 'inc_west' boundary condition
+                        if n_boundaries == 1:
+
+                            data += [-d_W, d_W]
+
+                        # 'uniform' boundary condition
+                        else:
+
+                            d_diri = 2. / h * 1. / \
+                                (xip1 * abs_fun([cell_centers[p]]))
+                            data += [-d_W, d_diri + d_W]
+
+            for p in mesh.interior_cells():
+
+                row += 3 * [p]
+                col += [p - 1, p, p + 1]
+
+                d_E = 2. / h * 1. / \
+                    (xip1 * (abs_fun([cell_centers[p + 1]]) +
+                             abs_fun([cell_centers[p]])))
+                d_W = 2. / h * 1. / \
+                    (xip1 * (abs_fun([cell_centers[p - 1]]) +
+                             abs_fun([cell_centers[p]])))
+
+                data += [-d_W, d_E + d_W, -d_E]
+
+        else:
+
+            # Save cell centers for efficiency reasons
+            cell_centers = mesh.cell_centers_2d()
+
+            # 'inc_west' boundary condition
+            if n_boundaries == 1:
+
+                # Lower left corner
+                p = mesh.south_west_corner()
+
+                row += 3 * [p]
+                col += [p, p + 1, p + mesh.n_cells[0]]
+
+                d_diri = 2. / mesh.h[0] * mesh.h[1] * \
+                    1. / (xip1 * abs_fun(cell_centers[p]))
+                d_E = 2. / mesh.h[0] * mesh.h[1] / \
+                    (xip1 *
+                     (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                d_N = 2. / mesh.h[1] * mesh.h[0] / (
+                    xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                d_p = d_diri + d_E + d_N
+
+                data += [d_p, -d_E, -d_N]
+
+                # Lower right corner
+                p = mesh.south_east_corner()
+
+                row += 3 * [p]
+                col += [p, p - 1, p + mesh.n_cells[0]]
+
+                d_W = 2. / mesh.h[0] * mesh.h[1] / \
+                    (xip1 *
+                     (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                d_N = 2. / mesh.h[1] * mesh.h[0] / (
+                    xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                d_p = d_W + d_N
+
+                data += [d_p, -d_W, -d_N]
+
+                # Upper left corner
+                p = mesh.north_west_corner()
+
+                row += 3 * [p]
+                col += [p, p + 1, p - mesh.n_cells[0]]
+
+                d_diri = 2. / mesh.h[0] * mesh.h[1] * \
+                    1. / (xip1 * abs_fun(cell_centers[p]))
+                d_E = 2. / mesh.h[0] * mesh.h[1] / \
+                    (xip1 *
+                     (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                d_S = 2. / mesh.h[1] * mesh.h[0] / (
+                    xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                d_p = d_diri + d_E + d_S
+
+                data += [d_p, -d_E, -d_S]
+
+                # Upper right corner
+                p = mesh.north_east_corner()
+
+                row += 3 * [p]
+                col += [p, p - 1, p - mesh.n_cells[0]]
+
+                d_W = 2. / mesh.h[0] * mesh.h[1] / \
+                    (xip1 *
+                     (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                d_S = 2. / mesh.h[1] * mesh.h[0] / (
+                    xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                d_p = d_W + d_S
+
+                data += [d_p, -d_W, -d_S]
+
+                # Right boundary
+                for p in mesh.boundary_cells(0):
+
+                    row += 4 * [p]
+                    col += [p, p - 1, p - mesh.n_cells[0], p + mesh.n_cells[0]]
+
+                    d_W = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                    d_S = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    d_N = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                    d_p = d_W + d_S + d_N
+                    data += [d_p, -d_W, -d_S, -d_N]
+
+                # Left boundary
+                for p in mesh.boundary_cells(1):
+
+                    row += 4 * [p]
+                    col += [p, p + 1, p - mesh.n_cells[0], p + mesh.n_cells[0]]
+
+                    d_diri = 2. / mesh.h[0] * mesh.h[1] / \
+                        (xip1 * abs_fun(cell_centers[p]))
+                    d_E = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                    d_S = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    d_N = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                    d_p = d_diri + d_E + d_S + d_N
+                    data += [d_p, -d_E, -d_S, -d_N]
+
+                # Upper boundary
+                for p in mesh.boundary_cells(2):
+
+                    row += 4 * [p]
+                    col += [p, p - 1, p + 1, p - mesh.n_cells[0]]
+
+                    d_E = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                    d_W = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                    d_S = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                    d_p = d_E + d_W + d_S
+                    data += [d_p, -d_W, -d_E, -d_S]
+
+                # Lower boundary
+                for p in mesh.boundary_cells(3):
+
+                    row += 4 * [p]
+                    col += [p, p - 1, p + 1, p + mesh.n_cells[0]]
+
+                    d_E = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                    d_W = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                    d_N = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                    d_p = d_E + d_W + d_N
+                    data += [d_p, -d_W, -d_E, -d_N]
+
+                # Interior cells
+                for p in mesh.interior_cells():
+
+                    row += 5 * [p]
+                    col += [p, p - 1, p + 1, p +
+                            mesh.n_cells[0], p - mesh.n_cells[0]]
+
+                    d_E = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                    d_W = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                    d_N = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    d_S = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                    d_p = d_E + d_W + d_N + d_S
+                    data += [d_p, -d_W, -d_E, -d_N, -d_S]
+
+            # 'uniform' boundary condition
+            else:
+
+                # Lower left corner
+                p = mesh.south_west_corner()
+
+                row += 3 * [p]
+                col += [p, p + 1, p + mesh.n_cells[0]]
+
+                d_diri = 2. / mesh.h[1] * mesh.h[0] * \
+                    1. / (xip1 * abs_fun(cell_centers[p]))
+                d_diri += 2. / mesh.h[0] * mesh.h[1] * \
+                    1. / (xip1 * abs_fun(cell_centers[p]))
+                d_E = 2. / mesh.h[0] * mesh.h[1] / \
+                    (xip1 *
+                     (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                d_N = 2. / mesh.h[1] * mesh.h[0] / (
+                    xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                d_p = d_diri + d_E + d_N
+
+                data += [d_p, -d_E, -d_N]
+
+                # Lower right corner
+                p = mesh.south_east_corner()
+
+                row += 3 * [p]
+                col += [p, p - 1, p + mesh.n_cells[0]]
+
+                d_diri = 2. / mesh.h[1] * mesh.h[0] * \
+                    1. / (xip1 * abs_fun(cell_centers[p]))
+                d_diri += 2. / mesh.h[0] * mesh.h[1] * \
+                    1. / (xip1 * abs_fun(cell_centers[p]))
+                d_W = 2. / mesh.h[0] * mesh.h[1] / \
+                    (xip1 *
+                     (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                d_N = 2. / mesh.h[1] * mesh.h[0] / (
+                    xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                d_p = d_diri + d_W + d_N
+
+                data += [d_p, -d_W, -d_N]
+
+                # Upper left corner
+                p = mesh.north_west_corner()
+
+                row += 3 * [p]
+                col += [p, p + 1, p - mesh.n_cells[0]]
+
+                d_diri = 2. / mesh.h[1] * mesh.h[0] * \
+                    1. / (xip1 * abs_fun(cell_centers[p]))
+                d_diri += 2. / mesh.h[0] * mesh.h[1] * \
+                    1. / (xip1 * abs_fun(cell_centers[p]))
+                d_E = 2. / mesh.h[0] * mesh.h[1] / \
+                    (xip1 *
+                     (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                d_S = 2. / mesh.h[1] * mesh.h[0] / (
+                    xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                d_p = d_diri + d_E + d_S
+
+                data += [d_p, -d_E, -d_S]
+
+                # Upper right corner
+                p = mesh.north_east_corner()
+
+                row += 3 * [p]
+                col += [p, p - 1, p - mesh.n_cells[0]]
+
+                d_diri = 2. / mesh.h[1] * mesh.h[0] * \
+                    1. / (xip1 * abs_fun(cell_centers[p]))
+                d_diri += 2. / mesh.h[0] * mesh.h[1] * \
+                    1. / (xip1 * abs_fun(cell_centers[p]))
+                d_W = 2. / mesh.h[0] * mesh.h[1] / \
+                    (xip1 *
+                     (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                d_S = 2. / mesh.h[1] * mesh.h[0] / (
+                    xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                d_p = d_diri + d_W + d_S
+
+                data += [d_p, -d_W, -d_S]
+
+                # Right boundary
+                for p in mesh.boundary_cells(0):
+
+                    row += 4 * [p]
+                    col += [p, p - 1, p - mesh.n_cells[0], p + mesh.n_cells[0]]
+
+                    d_diri = 2. / mesh.h[0] * mesh.h[1] / \
+                        (xip1 * abs_fun(cell_centers[p]))
+                    d_W = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                    d_S = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    d_N = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                    d_p = d_diri + d_W + d_S + d_N
+                    data += [d_p, -d_W, -d_S, -d_N]
+
+                # Left boundary
+                for p in mesh.boundary_cells(1):
+
+                    row += 4 * [p]
+                    col += [p, p + 1, p - mesh.n_cells[0], p + mesh.n_cells[0]]
+
+                    d_diri = 2. / mesh.h[0] * mesh.h[1] / \
+                        (xip1 * abs_fun(cell_centers[p]))
+                    d_E = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                    d_S = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    d_N = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                    d_p = d_diri + d_E + d_S + d_N
+                    data += [d_p, -d_E, -d_S, -d_N]
+
+                # Upper boundary
+                for p in mesh.boundary_cells(2):
+
+                    row += 4 * [p]
+                    col += [p, p - 1, p + 1, p - mesh.n_cells[0]]
+
+                    d_diri = 2. * mesh.h[0] / mesh.h[1] / \
+                        (xip1 * abs_fun(cell_centers[p]))
+                    d_E = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                    d_W = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                    d_S = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                    d_p = d_diri + d_E + d_W + d_S
+                    data += [d_p, -d_W, -d_E, -d_S]
+
+                # Lower boundary
+                for p in mesh.boundary_cells(3):
+
+                    row += 4 * [p]
+                    col += [p, p - 1, p + 1, p + mesh.n_cells[0]]
+
+                    d_diri = 2. * mesh.h[0] / mesh.h[1] / \
+                        (xip1 * abs_fun(cell_centers[p]))
+                    d_E = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                    d_W = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                    d_N = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                    d_p = d_diri + d_E + d_W + d_N
+                    data += [d_p, -d_W, -d_E, -d_N]
+
+                # Interior cells
+                for p in mesh.interior_cells():
+
+                    row += 5 * [p]
+                    col += [p, p - 1, p + 1, p +
+                            mesh.n_cells[0], p - mesh.n_cells[0]]
+
+                    d_E = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                    d_W = 2. / \
+                        mesh.h[0] * mesh.h[1] / \
+                        (xip1 *
+                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                    d_N = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    d_S = 2. / mesh.h[1] * mesh.h[0] / (
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+
+                    d_p = d_E + d_W + d_N + d_S
+                    data += [d_p, -d_W, -d_E, -d_N, -d_S]
+
+        return sps.coo_matrix((np.array(data) * 1./3., (row, col)),
+                              shape=(mesh.n_cells[0] * mesh.n_cells[1], mesh.n_cells[0] * mesh.n_cells[1]))
+
+    def __assemble_dirichlet__(self, mesh, abs_f, xip1, n_boundaries):
+        """
+        Assembles the vector of Dirichlet boundary conditions for the
+        diffusion problem.
+
+        Parameters
+        ----------
+        mesh : mesh.UniformMesh
+            Uniform mesh used for the discretization.
+        abs_f : callable
+        Callable object, representing the absorption coefficient. 
+        Takes values in the domain as argument.
+        scattering : string
+        Type of scattering process assumed for the medium
+        xip1 : float
+        The ratio between scattering coefficient and absorption
+        coefficient plus 1.0.
+        alpha_scat = xi * alpha_abs.
+        n_boundaries : int
+        The number of Dirichlet boundaries.
+
+        Returns
+        -------
+        numpy.ndarray
+            Load vector of the system
+        """
+
+        # Assemble a vector containing the Dirichlet boundary conditions
+        # given by diri_fun
+
+        # Cut-off value for absorption coefficient
+        eps = 1.e-6
+
+        # Modified absorption function
+        def abs_fun(x):
+
+            if abs(abs_f(x)) < eps:
+
+                return eps
+
+            else:
+
+                return abs_f(x)
+
+        # Define a Dirichlet boundary function
+        def diri_fun(x):
+
+            return float(self.inflow_bc[0])
+
+        diri_bc = np.zeros(self.n_dof)
+
+        if mesh.dim == 1:
+
+            # Get the mesh size h
+            h = mesh.dom_len[0] / mesh.n_cells[0]
+
+            # Save cell centers for efficiency reasons
+            cell_centers = mesh.cell_centers_1d()
+
+            # Get the distanceto a horizontal Dirichlet boundary
+            # with respect to an adjacent cell center.
+            distance = 0.5 * h
+
+            # 'inc_west' boundary condition: left-most vertex
+            diri_bc[0] = 2. / h * 1. / (xip1 * abs_fun([cell_centers[0]])) * \
+                diri_fun(cell_centers[0] - distance)
+
+            # 'uniform boundary condition'
+            if n_boundaries == 2:
+
+                # Right-most vertex
+                diri_bc[mesh.n_cells[0] - 1] = 2. / h * 1. / (xip1 * abs_fun(
+                    [cell_centers[mesh.n_cells[0] - 1]])) * diri_fun(cell_centers[mesh.n_cells[0] - 1] + distance)
+
+        else:
+
+            # Save cell centers for efficiency reasons
+            cell_centers = mesh.cell_centers_2d()
+
+            # Get the distances to a horizontal and vertical Dirichlet boundary
+            # with respect to an adjacent cell center.
+            distances = np.array([[0.5*mesh.h[0], 0], [0, 0.5*mesh.h[1]]])
+
+            # 'inc_west' boundary condition
+            if n_boundaries == 1:
+
+                # Lower left corner
+                p = mesh.south_west_corner()
+
+                diri_bc[p] = 2. / mesh.h[0] * mesh.h[1] * 1. / \
+                    (xip1 * abs_fun(cell_centers[p])) * \
+                    diri_fun(cell_centers[p] - distances[0])
+
+                # Upper left corner
+                p = mesh.north_west_corner()
+
+                diri_bc[p] = 2. / mesh.h[0] * mesh.h[1] * 1. / \
+                    (xip1 * abs_fun(cell_centers[p])) * \
+                    diri_fun(cell_centers[p] - distances[0])
+
+                # Left boundary
+                for p in mesh.boundary_cells(1):
+
+                    diri_bc[p] = 2. / mesh.h[0] * mesh.h[1] / (xip1 * abs_fun(
+                        cell_centers[p])) * diri_fun(cell_centers[p] - distances[0])
+
+            # 'uniform' boundary condition
+            else:
+
+                # Lower left corner
+                p = mesh.south_west_corner()
+
+                diri_bc[p] = 2. / mesh.h[1] * mesh.h[0] * 1. / \
+                    (xip1 * abs_fun(cell_centers[p])) * \
+                    diri_fun(cell_centers[p] - distances[1])
+                diri_bc[p] += 2. / mesh.h[0] * mesh.h[1] * 1. / \
+                    (xip1 * abs_fun(cell_centers[p])) * \
+                    diri_fun(cell_centers[p] - distances[0])
+
+                # Lower right corner
+                p = mesh.south_east_corner()
+
+                diri_bc[p] = 2. / mesh.h[1] * mesh.h[0] * 1. / \
+                    (xip1 * abs_fun(cell_centers[p])) * \
+                    diri_fun(cell_centers[p] - distances[1])
+                diri_bc[p] += 2. / mesh.h[0] * mesh.h[1] * 1. / \
+                    (xip1 * abs_fun(cell_centers[p])) * \
+                    diri_fun(cell_centers[p] + distances[0])
+
+                # Upper left corner
+                p = mesh.north_west_corner()
+
+                diri_bc[p] = 2. / mesh.h[1] * mesh.h[0] * 1. / \
+                    (xip1 * abs_fun(cell_centers[p])) * \
+                    diri_fun(cell_centers[p] + distances[1])
+                diri_bc[p] += 2. / mesh.h[0] * mesh.h[1] * 1. / \
+                    (xip1 * abs_fun(cell_centers[p])) * \
+                    diri_fun(cell_centers[p] - distances[0])
+
+                # Upper right corner
+                p = mesh.north_east_corner()
+
+                diri_bc[p] = 2. / mesh.h[1] * mesh.h[0] * 1. / \
+                    (xip1 * abs_fun(cell_centers[p])) * \
+                    diri_fun(cell_centers[p] + distances[1])
+                diri_bc[p] += 2. / mesh.h[0] * mesh.h[1] * 1. / \
+                    (xip1 * abs_fun(cell_centers[p])) * \
+                    diri_fun(cell_centers[p] + distances[0])
+
+                # Right boundary
+                for p in mesh.boundary_cells(0):
+
+                    diri_bc[p] = 2. / mesh.h[0] * mesh.h[1] * 1. / (xip1 * abs_fun(
+                        cell_centers[p])) * diri_fun(cell_centers[p] + distances[0])
+
+                # Left boundary
+                for p in mesh.boundary_cells(1):
+
+                    diri_bc[p] = 2. / mesh.h[0] * mesh.h[1] * 1. / (xip1 * abs_fun(
+                        cell_centers[p])) * diri_fun(cell_centers[p] - distances[0])
+
+                # Upper boundary
+                for p in mesh.boundary_cells(2):
+
+                    diri_bc[p] = 2. * mesh.h[0] / mesh.h[1] * 1. / (xip1 * abs_fun(
+                        cell_centers[p])) * diri_fun(cell_centers[p] + distances[1])
+
+                # Lower boundary
+                for p in mesh.boundary_cells(3):
+
+                    diri_bc[p] = 2. * mesh.h[0] / mesh.h[1] * 1. / (xip1 * abs_fun(
+                        cell_centers[p])) * diri_fun(cell_centers[p] - distances[1])
+
+        return 1./3. * diri_bc

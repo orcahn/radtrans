@@ -43,7 +43,7 @@ class RadiativeTransfer:
 
     def main(self, argv):
 
-        # parse parameter file
+        # Parse parameter file
         config = configparser.ConfigParser(allow_no_value=True)
         config.read(argv[1:])
 
@@ -125,12 +125,12 @@ class RadiativeTransfer:
 
         self.outputType = str(config['OUTPUT']['type'])
 
-        # define model problem and discretization
+        # Define model problem and discretization
         self.model_problem = modelProblem.ModelProblem(
             temperature, frequency, albedo, emissivity, scattering,
             absorption_coeff.abs_fun)
 
-        # time mesh generation
+        # Time mesh generation
         start_time = timeit.default_timer()
         self.mesh = mesh.UniformMesh(dimension, domain, n_cells)
         elapsed_time = timeit.default_timer() - start_time
@@ -138,7 +138,7 @@ class RadiativeTransfer:
 
         assert(method == 'finiteVolume')
 
-        # time matrix and load vector assembly
+        # Time matrix and load vector assembly
         start_time = timeit.default_timer()
 
         if scattering == 'isotropic':
@@ -167,7 +167,7 @@ class RadiativeTransfer:
 
         if not solver_name == 'SparseDirect':
 
-            # time precoditioner setup
+            # Time precoditioner setup
             start_time = timeit.default_timer()
 
             prec = solver.Preconditioner(disc, prec_type)
@@ -176,7 +176,7 @@ class RadiativeTransfer:
             print('Preconditioner setup:    ' +
                   "% 10.3e" % (elapsed_time) + ' s')
 
-            # time initial guess setup
+            # Time initial guess setup
             start_time = timeit.default_timer()
 
             if initial_guess == "thermalEmission":
@@ -188,20 +188,26 @@ class RadiativeTransfer:
                 if self.mesh.dim == 1:
 
                     sol1 = disc.inflow_bc[0] * \
-                        np.exp(-self.mesh.cell_centers()) + \
+                        np.exp(-self.mesh.cell_centers_1d()) + \
                         self.model_problem.s_e * \
-                        (1 - np.exp(-self.mesh.cell_centers()))
+                        (1 - np.exp(-self.mesh.cell_centers_1d()))
 
                     sol2 = disc.inflow_bc[1] * \
-                        np.exp(-self.mesh.cell_centers()[::-1]) + \
+                        np.exp(-self.mesh.cell_centers_1d()[::-1]) + \
                         self.model_problem.s_e * \
-                        (1 - np.exp(-self.mesh.cell_centers()[::-1]))
+                        (1 - np.exp(-self.mesh.cell_centers_1d()[::-1]))
 
-                    x_in = np.concatenate((sol1, sol2), axis=0)
+                    if flux == 'diffusion':
+
+                        x_in = np.mean((sol1, sol2), axis=0)
+
+                    else:
+
+                        x_in = np.concatenate((sol1, sol2), axis=0)
 
                 else:
 
-                    # create model problem without scattering
+                    # Create model problem without scattering
                     ns_mp = self.model_problem
                     ns_mp.scat = 'none'
 
@@ -209,7 +215,7 @@ class RadiativeTransfer:
                         ns_mp, self.mesh, self.n_ord, boundary_values, flux,
                         quad_method, False)
 
-                    # one step of lambda iteration
+                    # One step of lambda iteration
                     x_in = solver.invert_transport(ns_disc.stiff_mat,
                                                    ns_disc.load_vec,
                                                    self.n_ord)

@@ -179,7 +179,8 @@ class FiniteVolume:
 
                 print('Discretization:\n' +
                       '---------------\n' +
-                      '\n    - number of degrees of freedom: ' + str(self.n_dof) +
+                      '\n    - number of degrees of freedom: ' +
+                      str(self.n_dof) +
                       '\n    - quadrature method: ' + quadrature + ' rule\n' +
                       '    - numerical flux: ' + numerical_flux +
                       '\n\n')
@@ -240,8 +241,10 @@ class FiniteVolume:
 
                 print('Discretization:\n' +
                       '---------------\n' +
-                      '    - number of discrete ordinates: ' + str(n_ordinates) +
-                      '\n    - number of degrees of freedom: ' + str(self.n_dof) +
+                      '    - number of discrete ordinates: ' +
+                      str(n_ordinates) +
+                      '\n    - number of degrees of freedom: ' +
+                      str(self.n_dof) +
                       '\n    - quadrature method: ' + quadrature + ' rule\n' +
                       '    - numerical flux: ' + numerical_flux +
                       '\n\n')
@@ -253,8 +256,9 @@ class FiniteVolume:
 
             if mp.scat == 'isotropic':
 
-                # Ordinate weights could in principle be chosen arbitrarily,
-                # however we chose them such, that energy conservation is satisfied
+                # Ordinate weights could in principle be chosen
+                # arbitrarily. However we chose them such, that
+                # energy conservation is satisfied
                 if mesh.dim == 1:
                     do_weights = np.array([1.0, 1.0])
                     scat_prob = np.array([0.5, 0.5])
@@ -746,7 +750,8 @@ class FiniteVolume:
 
         return load_vec
 
-    def __assemble_diffusion__(self, mesh, abs_f, scattering, xip1, n_boundaries):
+    def __assemble_diffusion__(self, mesh, abs_f, scattering, xip1,
+                               n_boundaries):
         """
         Assembles the diffusion matrix.
 
@@ -755,7 +760,7 @@ class FiniteVolume:
         mesh : mesh.UniformMesh
             Uniform mesh used for the discretization.
         abs_f : callable
-        Callable object, representing the absorption coefficient. 
+        Callable object, representing the absorption coefficient.
         Takes values in the domain as argument.
         scattering : string
         Type of scattering process assumed for the medium
@@ -873,7 +878,8 @@ class FiniteVolume:
                     (xip1 *
                      (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
                 d_N = 2. / mesh.h[1] * mesh.h[0] / (
-                    xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) +
+                            abs_fun(cell_centers[p])))
 
                 d_p = d_diri + d_E + d_N
 
@@ -889,7 +895,8 @@ class FiniteVolume:
                     (xip1 *
                      (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
                 d_N = 2. / mesh.h[1] * mesh.h[0] / (
-                    xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) +
+                            abs_fun(cell_centers[p])))
 
                 d_p = d_W + d_N
 
@@ -907,7 +914,8 @@ class FiniteVolume:
                     (xip1 *
                      (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
                 d_S = 2. / mesh.h[1] * mesh.h[0] / (
-                    xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) +
+                            abs_fun(cell_centers[p])))
 
                 d_p = d_diri + d_E + d_S
 
@@ -923,7 +931,8 @@ class FiniteVolume:
                     (xip1 *
                      (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
                 d_S = 2. / mesh.h[1] * mesh.h[0] / (
-                    xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) +
+                            abs_fun(cell_centers[p])))
 
                 d_p = d_W + d_S
 
@@ -938,11 +947,14 @@ class FiniteVolume:
                     d_W = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p - 1]) +
+                          abs_fun(cell_centers[p])))
                     d_S = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
                     d_N = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
 
                     d_p = d_W + d_S + d_N
                     data += [d_p, -d_W, -d_S, -d_N]
@@ -958,11 +970,14 @@ class FiniteVolume:
                     d_E = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p + 1]) +
+                          abs_fun(cell_centers[p])))
                     d_S = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
                     d_N = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
 
                     d_p = d_diri + d_E + d_S + d_N
                     data += [d_p, -d_E, -d_S, -d_N]
@@ -976,13 +991,16 @@ class FiniteVolume:
                     d_E = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p + 1]) +
+                          abs_fun(cell_centers[p])))
                     d_W = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p - 1]) +
+                          abs_fun(cell_centers[p])))
                     d_S = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
 
                     d_p = d_E + d_W + d_S
                     data += [d_p, -d_W, -d_E, -d_S]
@@ -996,13 +1014,16 @@ class FiniteVolume:
                     d_E = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p + 1]) +
+                          abs_fun(cell_centers[p])))
                     d_W = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p - 1]) +
+                          abs_fun(cell_centers[p])))
                     d_N = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
 
                     d_p = d_E + d_W + d_N
                     data += [d_p, -d_W, -d_E, -d_N]
@@ -1017,15 +1038,19 @@ class FiniteVolume:
                     d_E = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p + 1]) +
+                          abs_fun(cell_centers[p])))
                     d_W = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p - 1]) +
+                          abs_fun(cell_centers[p])))
                     d_N = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
                     d_S = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
 
                     d_p = d_E + d_W + d_N + d_S
                     data += [d_p, -d_W, -d_E, -d_N, -d_S]
@@ -1047,7 +1072,8 @@ class FiniteVolume:
                     (xip1 *
                      (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
                 d_N = 2. / mesh.h[1] * mesh.h[0] / (
-                    xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) +
+                            abs_fun(cell_centers[p])))
 
                 d_p = d_diri + d_E + d_N
 
@@ -1067,7 +1093,8 @@ class FiniteVolume:
                     (xip1 *
                      (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
                 d_N = 2. / mesh.h[1] * mesh.h[0] / (
-                    xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) +
+                            abs_fun(cell_centers[p])))
 
                 d_p = d_diri + d_W + d_N
 
@@ -1087,7 +1114,8 @@ class FiniteVolume:
                     (xip1 *
                      (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
                 d_S = 2. / mesh.h[1] * mesh.h[0] / (
-                    xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) +
+                            abs_fun(cell_centers[p])))
 
                 d_p = d_diri + d_E + d_S
 
@@ -1107,7 +1135,8 @@ class FiniteVolume:
                     (xip1 *
                      (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
                 d_S = 2. / mesh.h[1] * mesh.h[0] / (
-                    xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                    xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) +
+                            abs_fun(cell_centers[p])))
 
                 d_p = d_diri + d_W + d_S
 
@@ -1124,11 +1153,14 @@ class FiniteVolume:
                     d_W = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p - 1]) +
+                          abs_fun(cell_centers[p])))
                     d_S = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
                     d_N = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
 
                     d_p = d_diri + d_W + d_S + d_N
                     data += [d_p, -d_W, -d_S, -d_N]
@@ -1144,11 +1176,14 @@ class FiniteVolume:
                     d_E = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p + 1]) +
+                          abs_fun(cell_centers[p])))
                     d_S = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
                     d_N = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
 
                     d_p = d_diri + d_E + d_S + d_N
                     data += [d_p, -d_E, -d_S, -d_N]
@@ -1164,13 +1199,16 @@ class FiniteVolume:
                     d_E = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p + 1]) +
+                          abs_fun(cell_centers[p])))
                     d_W = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p - 1]) +
+                          abs_fun(cell_centers[p])))
                     d_S = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
 
                     d_p = d_diri + d_E + d_W + d_S
                     data += [d_p, -d_W, -d_E, -d_S]
@@ -1186,13 +1224,16 @@ class FiniteVolume:
                     d_E = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p + 1]) +
+                          abs_fun(cell_centers[p])))
                     d_W = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p - 1]) +
+                          abs_fun(cell_centers[p])))
                     d_N = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
 
                     d_p = d_diri + d_E + d_W + d_N
                     data += [d_p, -d_W, -d_E, -d_N]
@@ -1207,21 +1248,26 @@ class FiniteVolume:
                     d_E = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p + 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p + 1]) +
+                          abs_fun(cell_centers[p])))
                     d_W = 2. / \
                         mesh.h[0] * mesh.h[1] / \
                         (xip1 *
-                         (abs_fun(cell_centers[p - 1]) + abs_fun(cell_centers[p])))
+                         (abs_fun(cell_centers[p - 1]) +
+                          abs_fun(cell_centers[p])))
                     d_N = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p + mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
                     d_S = 2. / mesh.h[1] * mesh.h[0] / (
-                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) + abs_fun(cell_centers[p])))
+                        xip1 * (abs_fun(cell_centers[p - mesh.n_cells[0]]) +
+                                abs_fun(cell_centers[p])))
 
                     d_p = d_E + d_W + d_N + d_S
                     data += [d_p, -d_W, -d_E, -d_N, -d_S]
 
         return sps.coo_matrix((np.array(data) * 1./3., (row, col)),
-                              shape=(mesh.n_cells[0] * mesh.n_cells[1], mesh.n_cells[0] * mesh.n_cells[1]))
+                              shape=(mesh.n_cells[0] * mesh.n_cells[1],
+                                     mesh.n_cells[0] * mesh.n_cells[1]))
 
     def __assemble_dirichlet__(self, mesh, abs_f, xip1, n_boundaries):
         """
@@ -1233,7 +1279,7 @@ class FiniteVolume:
         mesh : mesh.UniformMesh
             Uniform mesh used for the discretization.
         abs_f : callable
-        Callable object, representing the absorption coefficient. 
+        Callable object, representing the absorption coefficient.
         Takes values in the domain as argument.
         scattering : string
         Type of scattering process assumed for the medium
@@ -1295,7 +1341,8 @@ class FiniteVolume:
 
                 # Right-most vertex
                 diri_bc[mesh.n_cells[0] - 1] = 2. / h * 1. / (xip1 * abs_fun(
-                    [cell_centers[mesh.n_cells[0] - 1]])) * diri_fun(cell_centers[mesh.n_cells[0] - 1] + distance)
+                    [cell_centers[mesh.n_cells[0] - 1]])) * \
+                    diri_fun(cell_centers[mesh.n_cells[0] - 1] + distance)
 
         else:
 
@@ -1327,7 +1374,8 @@ class FiniteVolume:
                 for p in mesh.boundary_cells(1):
 
                     diri_bc[p] = 2. / mesh.h[0] * mesh.h[1] / (xip1 * abs_fun(
-                        cell_centers[p])) * diri_fun(cell_centers[p] - distances[0])
+                        cell_centers[p])) * diri_fun(cell_centers[p] -
+                                                     distances[0])
 
             # 'uniform' boundary condition
             else:
@@ -1375,25 +1423,31 @@ class FiniteVolume:
                 # Right boundary
                 for p in mesh.boundary_cells(0):
 
-                    diri_bc[p] = 2. / mesh.h[0] * mesh.h[1] * 1. / (xip1 * abs_fun(
-                        cell_centers[p])) * diri_fun(cell_centers[p] + distances[0])
+                    diri_bc[p] = 2. / mesh.h[0] * mesh.h[1] * 1. / \
+                        (xip1 * abs_fun(cell_centers[p])) * \
+                        diri_fun(cell_centers[p] + distances[0])
 
                 # Left boundary
                 for p in mesh.boundary_cells(1):
 
-                    diri_bc[p] = 2. / mesh.h[0] * mesh.h[1] * 1. / (xip1 * abs_fun(
-                        cell_centers[p])) * diri_fun(cell_centers[p] - distances[0])
+                    diri_bc[p] = 2. / mesh.h[0] * mesh.h[1] * 1. / \
+                        (xip1 * abs_fun(cell_centers[p])) * \
+                        diri_fun(cell_centers[p] - distances[0])
 
                 # Upper boundary
                 for p in mesh.boundary_cells(2):
 
-                    diri_bc[p] = 2. * mesh.h[0] / mesh.h[1] * 1. / (xip1 * abs_fun(
-                        cell_centers[p])) * diri_fun(cell_centers[p] + distances[1])
+                    diri_bc[p] = 2. * mesh.h[0] / mesh.h[1] * 1. / \
+                        (xip1 * abs_fun(
+                            cell_centers[p])) * \
+                        diri_fun(cell_centers[p] + distances[1])
 
                 # Lower boundary
                 for p in mesh.boundary_cells(3):
 
-                    diri_bc[p] = 2. * mesh.h[0] / mesh.h[1] * 1. / (xip1 * abs_fun(
-                        cell_centers[p])) * diri_fun(cell_centers[p] - distances[1])
+                    diri_bc[p] = 2. * mesh.h[0] / mesh.h[1] * 1. / \
+                        (xip1 * abs_fun(
+                            cell_centers[p])) * \
+                        diri_fun(cell_centers[p] - distances[1])
 
         return 1./3. * diri_bc

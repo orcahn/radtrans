@@ -27,13 +27,30 @@ As for linear solvers, there are options for a sparse direct solver (using Super
 GMRES iterative solvers. For the latter two, initial guesses corresponding to the zero vector, thermal emission
 of the medium and a problem absent of scattering can be chosen. Benchmarks suggest the use of the direct solver
 for less than or about 1e6 degrees of freedom, if memory permits. For larger systems the iterative solvers provide
-substantial benefits, particularly in terms of memory.
+substantial benefits, particularly in terms of memory consumption.
 
 
 ## Dependencies
 
-## Structure
-% how to use
+numpy, scipy and some latex stuff <- to be updated
+
+
+## Usage
+
+In order to perform a simulation, the parameters of the problem along with the desired options for discretization and solvers 
+have to be set in the **setup.ini** file. Once this is done, the simulation is performed by passing the setup.ini file as a command
+line argument to **radtrans.py**, which contains the driver for the simulation.
+
+E.g. in a Linux shell, a simulation with setup determined by setup.ini is run with 
+```
+python3 radtrans.py setup.ini
+```
+or
+```
+ipython3 radtrans.py setup.ini
+```
+
+
 ## Authors
 
 Jonas Roller and Robert Kutri

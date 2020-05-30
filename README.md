@@ -4,6 +4,9 @@ Programming project as part of the lecture 'Computational Methods for the
 Interaction of Light and Matter' held in conjunction by Prof. G. Kanschat and
 Prof. C. Dullemond at Heidelberg University.
 
+
+## About
+
 The project contains software that solves the (1D or 2D) radiative transfer equation
 for a homogeneous but anisotropic medium, in which isotropic scattering takes place.
 Radiation wavelength, as well as the temperature, emissivity and albedo of the medium
@@ -26,10 +29,11 @@ of the medium and a problem absent of scattering can be chosen. Benchmarks sugge
 for less than or about 1e6 degrees of freedom, if memory permits. For larger systems the iterative solvers provide
 substantial benefits, particularly in terms of memory.
 
-# Dependencies
 
-# Structure
+## Dependencies
+
+## Structure
 % how to use
-# Authors
+## Authors
 
 Jonas Roller and Robert Kutri

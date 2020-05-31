@@ -32,7 +32,12 @@ substantial benefits, particularly in terms of memory consumption.
 
 ## Dependencies
 
-numpy, scipy and some latex stuff <- to be updated
+We made extensive use of the **numpy** (https://numpy.org/) and **scipy** (https://scipy.org/) open-source software
+packages for numerical calculations. The project was tested using version 1.17 of numpy and 1.2.3 of scipy.
+
+Properly rendering the text in the images displaying the results of the simulation requires a working **LaTeX** installation,
+**dvipng** (which may be included with your LaTeX installation), and **Ghostscript** (GPL Ghostscript 9.0 or later is
+required). Alternatively, omitting these, the annotations and labels will be displayed using plain text.
 
 
 ## Usage
